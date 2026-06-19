@@ -7,6 +7,4 @@ artifacts/
 *.suo
 *.nupkg
 .DS_Store
-# Expanded third-party source. Import locally with scripts/setup-oda-dwftoolkit.*
-third_party/DWFToolkit-7.7/
 third_party/.tmp-dwftk-import/
