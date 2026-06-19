@@ -72,6 +72,24 @@ namespace
         return std::max(1, std::min(24, static_cast<int>(std::llround(static_cast<double>(w) * canvas->scale()))));
     }
 
+    // Maps the current line pattern to dash on/off lengths in pixels (scaled to the
+    // canvas). Returns {0,0} for a solid line. First-pass approximation: a couple of
+    // representative dash/dot cadences rather than the exact WHIP pattern tables.
+    std::pair<double, double> current_dash(WT_File& file, const RasterCanvas* canvas)
+    {
+        const double s = (canvas ? canvas->scale() : 1.0);
+        const double unit = std::max(1.0, 6.0 * s);
+        switch (file.rendition().line_pattern().pattern_id())
+        {
+            case WT_Line_Pattern::Solid:
+                return {0.0, 0.0};
+            case WT_Line_Pattern::Dotted:
+                return {std::max(1.0, unit * 0.25), unit};
+            default: // Dashed and the various long/short dash variants
+                return {unit * 2.0, unit};
+        }
+    }
+
     std::vector<PointD> points_from_set(const WT_Point_Set& set)
     {
         std::vector<PointD> pts;
@@ -100,7 +118,12 @@ namespace
         }
         else if (c->canvas)
         {
-            c->canvas->draw_polyline(pts, current_color(file), current_thickness(file, c->canvas));
+            const auto [on, off] = current_dash(file, c->canvas);
+            const int thick = current_thickness(file, c->canvas);
+            if (on > 0.0)
+                c->canvas->draw_dashed_polyline(pts, current_color(file), thick, on, off);
+            else
+                c->canvas->draw_polyline(pts, current_color(file), thick);
         }
         return WT_Result::Success;
     }

@@ -96,6 +96,23 @@ int main()
         expect(is_color(pixel_at(c, 10, 50), 255, 0, 0), "clear_clip restores full-canvas drawing");
     }
 
+    // A dashed polyline paints "on" runs and leaves "off" gaps white.
+    {
+        RasterCanvas c(100, 100, unit_box());
+        std::vector<PointD> line = {{0, 50}, {100, 50}}; // maps to pixel row y=50, x grows 0..100
+        c.draw_dashed_polyline(line, blue, 1, /*on*/10.0, /*off*/10.0);
+        expect(is_color(pixel_at(c, 2, 50), 0, 0, 255), "dashed line paints inside an on-run");
+        expect(is_color(pixel_at(c, 15, 50), 255, 255, 255), "dashed line leaves an off-gap white");
+    }
+
+    // dash_on <= 0 falls back to a solid stroke.
+    {
+        RasterCanvas c(100, 100, unit_box());
+        std::vector<PointD> line = {{0, 50}, {100, 50}};
+        c.draw_dashed_polyline(line, blue, 1, 0.0, 10.0);
+        expect(is_color(pixel_at(c, 15, 50), 0, 0, 255), "dash_on<=0 draws a solid line");
+    }
+
     if (g_failures == 0)
     {
         std::printf("All RasterCanvas tests passed.\n");

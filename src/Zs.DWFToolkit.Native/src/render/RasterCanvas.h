@@ -59,6 +59,10 @@ public:
     void clear(Rgba c);
     void draw_line(PointD a, PointD b, Rgba color, int thickness);
     void draw_polyline(const std::vector<PointD>& pts, Rgba color, int thickness, bool closed = false);
+    // Like draw_polyline but stroked as a dash pattern (on/off lengths in pixels).
+    // The dash phase is carried across vertices so corners stay continuous.
+    void draw_dashed_polyline(const std::vector<PointD>& pts, Rgba color, int thickness,
+                              double dash_on_px, double dash_off_px, bool closed = false);
     void fill_polygon(const std::vector<PointD>& pts, Rgba color);
     void draw_ellipse(PointD center, double radius_x, double radius_y, double tilt_rad, Rgba color, int thickness);
     void fill_ellipse(PointD center, double radius_x, double radius_y, double tilt_rad, Rgba color);

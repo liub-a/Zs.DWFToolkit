@@ -136,6 +136,48 @@ void RasterCanvas::draw_polyline(const std::vector<PointD>& pts, Rgba color, int
         draw_line(pts.back(), pts.front(), color, thickness);
 }
 
+void RasterCanvas::draw_dashed_polyline(const std::vector<PointD>& pts, Rgba color, int thickness,
+                                        double dash_on_px, double dash_off_px, bool closed)
+{
+    if (pts.size() < 2)
+        return;
+    if (dash_on_px <= 0.0)
+    {
+        draw_polyline(pts, color, thickness, closed);
+        return;
+    }
+    const double off = std::max(0.0, dash_off_px);
+    const double period = dash_on_px + off;
+    const int radius = std::max(0, thickness / 2);
+
+    std::vector<PointD> px;
+    px.reserve(pts.size());
+    for (const auto& p : pts)
+        px.push_back(to_pixel(p));
+    if (closed)
+        px.push_back(px.front());
+
+    double phase = 0.0; // distance into the current period, carried across segments
+    for (std::size_t i = 1; i < px.size(); ++i)
+    {
+        const double x0 = px[i - 1].x, y0 = px[i - 1].y;
+        const double x1 = px[i].x, y1 = px[i].y;
+        const double seg_len = std::hypot(x1 - x0, y1 - y0);
+        if (seg_len < 1e-9)
+            continue;
+        const double ux = (x1 - x0) / seg_len;
+        const double uy = (y1 - y0) / seg_len;
+        for (double d = 0.0; d <= seg_len; d += 1.0)
+        {
+            const double pos = std::fmod(phase + d, period);
+            if (pos < dash_on_px)
+                draw_disc(static_cast<int>(std::llround(x0 + ux * d)),
+                          static_cast<int>(std::llround(y0 + uy * d)), radius, color);
+        }
+        phase = std::fmod(phase + seg_len, period);
+    }
+}
+
 void RasterCanvas::fill_polygon(const std::vector<PointD>& pts, Rgba color)
 {
     if (pts.size() < 3)
