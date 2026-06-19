@@ -8,7 +8,6 @@
 - ZIP/OPC 包结构读取；
 - DWFx/XPS FixedPage 页信息读取；
 - DWF 包内 `.w2d` 资源初步识别；
-- 低层 ZIP/OPC 包提取、复制、资源替换；
 - 包内缩略图/预览图提取；
 - DWFx/XPS 通过外部工具转 PDF；
 - DWFx/XPS 通过外部工具转 PNG/JPEG；
@@ -27,7 +26,6 @@
 |---|---|
 | DWF/DWFx 包信息读取 | 已实现基础版 |
 | DWF/DWFx 缩略图提取 | 已实现 |
-| ZIP/OPC 低层写入/替换 | 已实现基础版，不等同语义 CAD 编辑 |
 | DWFx/XPS 转图片 | 已实现外部工具适配，依赖 `mutool` |
 | DWFx/XPS 转 PDF | 已实现外部工具适配，依赖 `mutool` 或 `gxps` |
 | 普通 DWF 转图片 | Native Bridge 已搭好，渲染器待实现 |
@@ -67,17 +65,7 @@ dotnet run --project samples/Zs.DWFToolkit.CliDemo -- info ./test.dwfx
 dotnet run --project samples/Zs.DWFToolkit.CliDemo -- thumbnail ./test.dwf --out ./out/thumb.jpg
 ```
 
-### 4. 低层包提取/复制/替换
-
-```bash
-dotnet run --project samples/Zs.DWFToolkit.CliDemo -- extract ./test.dwf --out-dir ./out/extract
-dotnet run --project samples/Zs.DWFToolkit.CliDemo -- copy ./test.dwf --out ./out/copy.dwf
-dotnet run --project samples/Zs.DWFToolkit.CliDemo -- replace-entry ./test.dwf --entry path/in/package.png --file new.png --out ./out/new.dwf
-```
-
-注意：这是 ZIP/OPC 资源级写入，不是 CAD 语义编辑。
-
-### 5. DWFx 转图片
+### 4. DWFx 转图片
 
 需要安装 MuPDF 的 `mutool`。
 
@@ -91,13 +79,13 @@ dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-images ./test.dwfx --ou
 dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-images ./test.dwfx --out-dir ./out/images --mutool /usr/local/bin/mutool
 ```
 
-### 6. DWFx 转 PDF
+### 5. DWFx 转 PDF
 
 ```bash
 dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-pdf ./test.dwfx --out ./out/test.pdf
 ```
 
-### 7. 构建 Native Stub
+### 6. 构建 Native Stub
 
 ```bash
 ./scripts/build-native.sh
@@ -176,6 +164,23 @@ DWFx：尝试 mutool/gxps 转图片和 PDF
 后续：如果客户强依赖普通 DWF 单文件预览，再实现 Native 渲染或接商业库
 ```
 
+## ODA 修改版 DWF Toolkit
+
+已集成 ODA 修改版 DWF Toolkit 的导入脚本和 Native CMake 开关。把你下载/上传的 `DWFToolkit-7.7-src-ODA.zip` 放到本地后，先解压到 `third_party/DWFToolkit-7.7` 作为可选 Native 依赖。默认构建仍使用轻量 Native Stub；需要尝试编译 ODA 修改版 Toolkit 时先执行：
+
+```bash
+./scripts/setup-oda-dwftoolkit.sh /path/to/DWFToolkit-7.7-src-ODA.zip
+```
+
+然后开启：
+
+```bash
+cmake -S src/Zs.DWFToolkit.Native -B build/native-oda -DZS_DWF_ENABLE_ODA_DWFTK=ON
+cmake --build build/native-oda -j
+```
+
+详细说明见 `docs/THIRD_PARTY_DWFTK_ODA.md`。
+
 ## 许可证说明
 
-本仓库代码仅包含你自己的骨架实现，不包含 Autodesk/ODA DWF Toolkit 源码或二进制。你需要自行获取并确认 DWF Toolkit 或第三方工具的授权。
+本仓库代码默认不直接公开分发 Autodesk/ODA DWF Toolkit 源码或二进制；通过 `scripts/setup-oda-dwftoolkit.*` 在本地导入。你需要自行确认 DWF Toolkit 或第三方工具的授权。
