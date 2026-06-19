@@ -49,10 +49,13 @@ jobs:
       - name: Install build tools
         run: sudo apt-get update && sudo apt-get install -y cmake g++
 
-      - name: Configure + build (default)
+      - name: Configure + build (default, with native tests)
         run: |
-          cmake -S src/Zs.DWFToolkit.Native -B build/native-default -DCMAKE_BUILD_TYPE=Release
+          cmake -S src/Zs.DWFToolkit.Native -B build/native-default -DCMAKE_BUILD_TYPE=Release -DZS_DWF_BUILD_TESTS=ON
           cmake --build build/native-default --config Release -j
+
+      - name: Run native unit tests
+        run: ctest --test-dir build/native-default --output-on-failure
 
       - name: Upload library
         uses: actions/upload-artifact@v4
