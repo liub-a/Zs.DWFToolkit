@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  managed:
+    name: Managed build + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore Zs.DWFToolkit.slnx
+
+      - name: Build
+        run: dotnet build Zs.DWFToolkit.slnx --configuration Release --no-restore
+
+      - name: Test (+ coverage)
+        run: >-
+          dotnet test Zs.DWFToolkit.slnx
+          --configuration Release --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./TestResults
+          if-no-files-found: ignore
+
+  native-default:
+    name: Native build (stub W2D, no ODA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake g++
+
+      - name: Configure + build (default)
+        run: |
+          cmake -S src/Zs.DWFToolkit.Native -B build/native-default -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/native-default --config Release -j
+
+      - name: Upload library
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-default-linux-x64
+          path: build/native-default/libzs_dwf_toolkit_native.so
+          if-no-files-found: warn
+
+  native-oda:
+    name: Native build (ODA W2D renderer)
+    runs-on: ubuntu-latest
+    # The ODA path is allowed to fail until the bundled toolkit builds cleanly on
+    # CI; it still surfaces compile errors without blocking the rest of the matrix.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ unzip
+
+      - name: Import ODA-modified DWF Toolkit source
+        run: ./scripts/setup-oda-dwftoolkit.sh
+
+      - name: Configure + build (ZS_DWF_ENABLE_ODA_DWFTK=ON)
+        run: |
+          cmake -S src/Zs.DWFToolkit.Native -B build/native-oda -DZS_DWF_ENABLE_ODA_DWFTK=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/native-oda --target zs_dwf_toolkit_native --config Release -j
+
+      - name: Upload library
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-oda-linux-x64
+          path: build/native-oda/libzs_dwf_toolkit_native.so
+          if-no-files-found: warn
