@@ -22,19 +22,27 @@ public sealed class DwfRenderOptions
     /// <summary>Use the native DWF renderer first for ordinary DWF files when available.</summary>
     public bool PreferNativeDwfRenderer { get; set; } = false;
 
-    /// <summary>Extract embedded raster page resources from ZIP/OPC style DWF packages when vector rendering is unavailable.</summary>
-    public bool ExtractRasterImagesFallback { get; set; } = true;
+    /// <summary>
+    /// Legacy diagnostic switch. Do not use embedded raster/page-preview resources as successful page rendering
+    /// in production because those resources may be thumbnails, partial previews, or unrelated images.
+    /// </summary>
+    [Obsolete("Embedded raster resources are not reliable page renders. Use ExtractBestThumbnailAsync for thumbnails or a native W2D renderer for conversion.")]
+    public bool ExtractRasterImagesFallback { get; set; } = false;
 
-    /// <summary>Minimum embedded image size to consider a page preview instead of an icon.</summary>
+    /// <summary>Minimum embedded image size for the legacy diagnostic raster extractor.</summary>
     public long RasterImageMinBytes { get; set; } = 4096;
 
-    /// <summary>When non-thumbnail raster resources exist, ignore thumbnail-named images.</summary>
+    /// <summary>When non-thumbnail raster resources exist, ignore thumbnail-named images in legacy diagnostic extraction.</summary>
     public bool SkipThumbnailWhenRasterImagesExist { get; set; } = true;
 
-    /// <summary>Extract the best embedded image when no page raster resources can be rendered/extracted.</summary>
-    public bool ExtractThumbnailFallback { get; set; } = true;
+    /// <summary>
+    /// Legacy diagnostic switch. Thumbnail extraction is exposed as ExtractBestThumbnailAsync and is not treated
+    /// as a successful image conversion.
+    /// </summary>
+    [Obsolete("Thumbnail fallback is not drawing-grade conversion. Use ExtractBestThumbnailAsync explicitly.")]
+    public bool ExtractThumbnailFallback { get; set; } = false;
 
-    /// <summary>For ordinary DWF PDF conversion, render/extract images first and assemble them into PDF.</summary>
+    /// <summary>For ordinary DWF PDF conversion, render pages with the native renderer first and assemble them into PDF.</summary>
     public bool CreatePdfFromImagesFallback { get; set; } = true;
 
     /// <summary>Optional fixed page width in PDF points for the simple image PDF writer.</summary>
