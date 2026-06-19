@@ -113,6 +113,24 @@ int main()
         expect(is_color(pixel_at(c, 15, 50), 0, 0, 255), "dash_on<=0 draws a solid line");
     }
 
+    // A hatched polygon paints diagonal lines: interior has both painted and
+    // unpainted (white) pixels, unlike a solid fill.
+    {
+        RasterCanvas c(100, 100, unit_box());
+        std::vector<PointD> square = {{10, 10}, {90, 10}, {90, 90}, {10, 90}};
+        c.hatch_polygon(square, red, 8);
+        int painted = 0, white = 0;
+        for (int y = 30; y < 70; ++y)
+            for (int x = 30; x < 70; ++x)
+            {
+                const auto& p = pixel_at(c, x, y);
+                if (is_color(p, 255, 0, 0)) ++painted;
+                else if (is_color(p, 255, 255, 255)) ++white;
+            }
+        expect(painted > 0, "hatch paints some interior pixels");
+        expect(white > 0, "hatch leaves gaps between lines (not a solid fill)");
+    }
+
     if (g_failures == 0)
     {
         std::printf("All RasterCanvas tests passed.\n");

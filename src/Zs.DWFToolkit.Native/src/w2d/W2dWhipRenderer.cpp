@@ -149,7 +149,18 @@ namespace
         else if (c->canvas && is_visible(file))
         {
             const auto color = current_color(file);
-            c->canvas->fill_polygon(pts, color);
+            // A non-solid fill pattern is rendered as a diagonal hatch; otherwise
+            // the interior is solid-filled.
+            const WT_Fill_Pattern::WT_Pattern_ID fp = file.rendition().fill_pattern().pattern_id();
+            if (fp != WT_Fill_Pattern::Solid && fp != WT_Fill_Pattern::Illegal)
+            {
+                const int spacing = std::max(4, static_cast<int>(std::llround(8.0 * c->canvas->scale())));
+                c->canvas->hatch_polygon(pts, color, spacing);
+            }
+            else
+            {
+                c->canvas->fill_polygon(pts, color);
+            }
             c->canvas->draw_polyline(pts, color, current_thickness(file, c->canvas), true);
         }
         return WT_Result::Success;

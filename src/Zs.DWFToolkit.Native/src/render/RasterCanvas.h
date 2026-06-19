@@ -64,6 +64,9 @@ public:
     void draw_dashed_polyline(const std::vector<PointD>& pts, Rgba color, int thickness,
                               double dash_on_px, double dash_off_px, bool closed = false);
     void fill_polygon(const std::vector<PointD>& pts, Rgba color);
+    // Fills the polygon interior with diagonal hatch lines spaced spacing_px apart
+    // (45 degrees; back_diagonal flips the slope). Approximates W2D hatch fills.
+    void hatch_polygon(const std::vector<PointD>& pts, Rgba color, int spacing_px, bool back_diagonal = false);
     void draw_ellipse(PointD center, double radius_x, double radius_y, double tilt_rad, Rgba color, int thickness);
     void fill_ellipse(PointD center, double radius_x, double radius_y, double tilt_rad, Rgba color);
     void draw_text_marker(PointD position, int glyph_count, Rgba color, int thickness);

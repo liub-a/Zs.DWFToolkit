@@ -225,6 +225,50 @@ void RasterCanvas::fill_polygon(const std::vector<PointD>& pts, Rgba color)
     }
 }
 
+void RasterCanvas::hatch_polygon(const std::vector<PointD>& pts, Rgba color, int spacing_px, bool back_diagonal)
+{
+    if (pts.size() < 3)
+        return;
+    const int spacing = std::max(2, spacing_px);
+
+    std::vector<PointD> p;
+    p.reserve(pts.size());
+    for (auto v : pts)
+        p.push_back(to_pixel(v));
+
+    double min_y = p[0].y, max_y = p[0].y;
+    for (const auto& v : p) { min_y = std::min(min_y, v.y); max_y = std::max(max_y, v.y); }
+
+    const int y0 = clamp_int(static_cast<int>(std::floor(min_y)), 0, _height - 1);
+    const int y1 = clamp_int(static_cast<int>(std::ceil(max_y)), 0, _height - 1);
+    std::vector<double> nodes;
+
+    for (int y = y0; y <= y1; ++y)
+    {
+        nodes.clear();
+        const double scan_y = static_cast<double>(y) + 0.5;
+        for (std::size_t i = 0, j = p.size() - 1; i < p.size(); j = i++)
+        {
+            const auto& pi = p[i];
+            const auto& pj = p[j];
+            if ((pi.y < scan_y && pj.y >= scan_y) || (pj.y < scan_y && pi.y >= scan_y))
+                nodes.push_back(pi.x + (scan_y - pi.y) / (pj.y - pi.y) * (pj.x - pi.x));
+        }
+        std::sort(nodes.begin(), nodes.end());
+        for (std::size_t k = 0; k + 1 < nodes.size(); k += 2)
+        {
+            const int xs = clamp_int(static_cast<int>(std::ceil(nodes[k])), 0, _width - 1);
+            const int xe = clamp_int(static_cast<int>(std::floor(nodes[k + 1])), 0, _width - 1);
+            for (int x = xs; x <= xe; ++x)
+            {
+                const int diag = back_diagonal ? (x - y) : (x + y);
+                if (((diag % spacing) + spacing) % spacing == 0)
+                    set_pixel(x, y, color);
+            }
+        }
+    }
+}
+
 void RasterCanvas::draw_ellipse(PointD center, double radius_x, double radius_y, double tilt_rad, Rgba color, int thickness)
 {
     std::vector<PointD> pts;
