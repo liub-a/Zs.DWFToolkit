@@ -31,21 +31,15 @@ target_include_directories(zs_dwf_toolkit_native PRIVATE
 target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_TOOLKIT_NATIVE_EXPORTS)
 
 if(ZS_DWF_WITH_FREETYPE)
-    # Self-contained text rendering: vendor FreeType (no external deps) and embed a
-    # font, so neither a system FreeType nor a system font file is required at runtime.
-    include(FetchContent)
+    # Self-contained text rendering: FreeType source is vendored in-tree
+    # (third_party/freetype, v2.13.3) and built with no external deps, so the build
+    # needs no network and no system FreeType, and a font is embedded below.
     set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
     set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
     set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
     set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
     set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
-    FetchContent_Declare(
-        freetype
-        GIT_REPOSITORY https://github.com/freetype/freetype.git
-        GIT_TAG VER-2-13-3
-        GIT_SHALLOW TRUE
-    )
-    FetchContent_MakeAvailable(freetype)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/freetype" "${CMAKE_BINARY_DIR}/freetype" EXCLUDE_FROM_ALL)
 
     # Compile the bundled font into the library as a byte array (build-time generated).
     set(ZS_DWF_FONT_TTF "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/fonts/DejaVuSans.ttf")
@@ -69,9 +63,9 @@ endif()
 
 option(ZS_DWF_WITH_TIFF "Decode Group4X fax W2D images via a vendored libtiff" OFF)
 if(ZS_DWF_WITH_TIFF)
-    # Vendor libtiff (static, codecs/tools off) so Group4 (CCITT T.6) fax images
-    # decode without a system libtiff. The CCITT fax codec is built into libtiff.
-    include(FetchContent)
+    # libtiff source is vendored in-tree (third_party/libtiff, v4.6.0), built static
+    # with codecs/tools/tests off. The CCITT fax codec is internal, so Group4 decodes
+    # with no network and no system libtiff.
     set(tiff-tools OFF CACHE BOOL "" FORCE)
     set(tiff-tests OFF CACHE BOOL "" FORCE)
     set(tiff-docs OFF CACHE BOOL "" FORCE)
@@ -84,14 +78,7 @@ if(ZS_DWF_WITH_TIFF)
     set(webp OFF CACHE BOOL "" FORCE)
     set(zlib OFF CACHE BOOL "" FORCE)
     set(libdeflate OFF CACHE BOOL "" FORCE)
-    set(BUILD_SHARED_LIBS OFF)
-    FetchContent_Declare(
-        tiff
-        GIT_REPOSITORY https://gitlab.com/libtiff/libtiff.git
-        GIT_TAG v4.6.0
-        GIT_SHALLOW TRUE
-    )
-    FetchContent_MakeAvailable(tiff)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/libtiff" "${CMAKE_BINARY_DIR}/libtiff" EXCLUDE_FROM_ALL)
     target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_WITH_TIFF=1)
     target_link_libraries(zs_dwf_toolkit_native PRIVATE tiff)
 endif()
