@@ -8,4 +8,5 @@ public sealed record DwfPackageEntryInfo(
     bool IsXml,
     bool IsPossibleThumbnail,
     bool IsPossibleW2d,
-    bool IsPossibleXpsPage);
+    bool IsPossibleXpsPage,
+    bool IsPossibleW3d = false);

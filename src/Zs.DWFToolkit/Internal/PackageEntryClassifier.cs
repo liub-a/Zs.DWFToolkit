@@ -30,6 +30,7 @@ internal static class PackageEntryClassifier
             IsXml: isXml,
             IsPossibleThumbnail: isImage && (lower.Contains("thumb") || lower.Contains("preview") || lower.Contains("thumbnail")),
             IsPossibleW2d: string.Equals(ext, ".w2d", StringComparison.OrdinalIgnoreCase),
-            IsPossibleXpsPage: string.Equals(ext, ".fpage", StringComparison.OrdinalIgnoreCase));
+            IsPossibleXpsPage: string.Equals(ext, ".fpage", StringComparison.OrdinalIgnoreCase),
+            IsPossibleW3d: string.Equals(ext, ".w3d", StringComparison.OrdinalIgnoreCase) || lower.Contains("emodel"));
     }
 }

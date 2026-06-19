@@ -189,6 +189,22 @@ public sealed class DwfxExternalConverter : IDwfConverter
         CancellationToken cancellationToken)
     {
         var imageFormat = NormalizeImageFormat(options.ImageFormat);
+
+        // 3D DWF (eModel) has no 2D graphics to rasterize; fail with a specific code
+        // instead of the generic unsupported-rendering message.
+        if (info.Success && info.Pages.Count > 0 &&
+            info.Pages.All(p => p.Has3dGraphics) && info.Pages.All(p => !p.Has2dGraphics))
+        {
+            return new DwfRenderResult
+            {
+                Success = false,
+                ErrorCode = DwfErrorCodes.Unsupported3dDwf,
+                ErrorMessage = "This DWF contains only 3D (eModel) graphics, which this 2D preview/edit pipeline cannot rasterize.",
+                SourcePath = sourcePath,
+                OutputDirectory = outputDirectory
+            };
+        }
+
         var pageCount = Math.Max(info.PageCount, 1);
 
         if (options.PreferNativeDwfRenderer && _nativeRenderer is { IsAvailable: true })

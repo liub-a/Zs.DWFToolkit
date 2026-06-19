@@ -153,6 +153,25 @@ public sealed class DwfDocumentReader : IDwfDocumentReader
             }
         }
 
+        // 3D DWF (eModel/.w3d) has no 2D graphics this lightweight reader can preview;
+        // surface it explicitly so conversion can return unsupported_3d_dwf instead of a
+        // generic failure.
+        if (pages.Count == 0)
+        {
+            var w3d = entries.Where(e => e.IsPossibleW3d).ToList();
+            for (var i = 0; i < w3d.Count; i++)
+            {
+                pages.Add(new DwfPageInfo
+                {
+                    PageIndex = i,
+                    PageName = Path.GetFileNameWithoutExtension(w3d[i].FullName),
+                    GraphicsResourcePath = w3d[i].FullName,
+                    Has3dGraphics = true,
+                    Unit = "dwf_internal"
+                });
+            }
+        }
+
         if (pages.Count == 0)
         {
             // Some DWF files only expose images/thumbnails to this lightweight reader.
