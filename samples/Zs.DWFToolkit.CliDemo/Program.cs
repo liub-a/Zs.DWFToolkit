@@ -41,15 +41,6 @@ internal sealed class CliApp
                 case "pdf":
                     await ToPdfAsync();
                     break;
-                case "extract":
-                    await ExtractAsync();
-                    break;
-                case "copy":
-                    await CopyAsync();
-                    break;
-                case "replace-entry":
-                    await ReplaceEntryAsync();
-                    break;
                 default:
                     Console.Error.WriteLine($"Unknown command: {command}");
                     PrintHelp();
@@ -101,35 +92,6 @@ internal sealed class CliApp
         Environment.ExitCode = result.Success ? 0 : 1;
     }
 
-    private async Task ExtractAsync()
-    {
-        var input = RequireArg(1, "input file");
-        var outDir = GetOption("--out-dir") ?? GetOption("--out") ?? Path.Combine(Environment.CurrentDirectory, "dwf-extract");
-        var result = await _toolkit.ExtractAllAsync(input, outDir);
-        Console.WriteLine(JsonSerializer.Serialize(result, JsonOptions));
-        Environment.ExitCode = result.Success ? 0 : 1;
-    }
-
-    private async Task CopyAsync()
-    {
-        var input = RequireArg(1, "input file");
-        var output = GetOption("--out") ?? throw new ArgumentException("--out is required.");
-        var result = await _toolkit.CopyPackageAsync(input, output);
-        Console.WriteLine(JsonSerializer.Serialize(result, JsonOptions));
-        Environment.ExitCode = result.Success ? 0 : 1;
-    }
-
-    private async Task ReplaceEntryAsync()
-    {
-        var input = RequireArg(1, "input file");
-        var output = GetOption("--out") ?? throw new ArgumentException("--out is required.");
-        var entry = GetOption("--entry") ?? throw new ArgumentException("--entry is required.");
-        var file = GetOption("--file") ?? throw new ArgumentException("--file is required.");
-        var result = await _toolkit.ReplaceEntryAsync(input, output, entry, file);
-        Console.WriteLine(JsonSerializer.Serialize(result, JsonOptions));
-        Environment.ExitCode = result.Success ? 0 : 1;
-    }
-
     private DwfRenderOptions ReadOptions()
     {
         var options = new DwfRenderOptions();
@@ -141,8 +103,6 @@ internal sealed class CliApp
         options.MutoolPath = GetOption("--mutool");
         options.GhostXpsPath = GetOption("--gxps");
         options.PreferNativeDwfRenderer = HasFlag("--native");
-        options.ExtractRasterImagesFallback = !HasFlag("--no-raster-fallback");
-        options.ExtractThumbnailFallback = !HasFlag("--no-thumb-fallback");
         options.CreatePdfFromImagesFallback = !HasFlag("--no-image-pdf-fallback");
         options.KeepTemporaryFiles = HasFlag("--keep-temp");
         if (long.TryParse(GetOption("--min-image-bytes"), out var minBytes)) options.RasterImageMinBytes = minBytes;
@@ -181,15 +141,10 @@ Usage:
   Zs.DWFToolkit.CliDemo thumbnail <file.dwf|file.dwfx> --out <thumb.jpg>
   Zs.DWFToolkit.CliDemo to-images <file.dwfx|file.dwf> --out-dir <dir> [--dpi 200] [--format png] [--mutool /path/mutool] [--gxps /path/gxps] [--native]
   Zs.DWFToolkit.CliDemo to-pdf <file.dwfx|file.dwf> --out <output.pdf> [--mutool /path/mutool] [--gxps /path/gxps] [--native]
-  Zs.DWFToolkit.CliDemo extract <file.dwf|file.dwfx> --out-dir <dir>
-  Zs.DWFToolkit.CliDemo copy <file.dwf|file.dwfx> --out <copy.dwf>
-  Zs.DWFToolkit.CliDemo replace-entry <file.dwf|file.dwfx> --entry <package/path> --file <replacement> --out <new.dwf>
 
 Options:
-  --no-raster-fallback       Disable embedded raster page/preview extraction for ordinary DWF.
-  --no-thumb-fallback        Disable embedded thumbnail fallback.
-  --no-image-pdf-fallback    Disable ordinary DWF image-to-PDF fallback.
-  --min-image-bytes <n>      Minimum embedded raster resource size; default 4096.
+  --no-image-pdf-fallback    Disable ordinary DWF native-rendered image-to-PDF assembly.
+  --min-image-bytes <n>      Legacy diagnostic raster extractor threshold; not used by conversion by default.
   --pdf-width <points>       Fixed PDF page width for simple image PDF writer.
   --pdf-height <points>      Fixed PDF page height for simple image PDF writer.
   --pdf-margin <points>      Margin for simple image PDF writer.
@@ -197,8 +152,9 @@ Options:
 
 Notes:
   - DWFx/XPS image/PDF conversion uses external tools such as MuPDF mutool or GhostXPS/gxps.
-  - Plain DWF conversion first tries native rendering when --native is enabled.
-  - Without native rendering, ordinary DWF can still extract embedded raster page/preview images and assemble a fallback PDF.
+  - Plain DWF conversion requires native rendering when --native is enabled.
+  - Without a real native W2D/DWF renderer, ordinary DWF conversion fails instead of returning incomplete thumbnails/previews.
+  - Use the thumbnail command explicitly when you only need a best-effort thumbnail.
 """);
     }
 }
