@@ -206,28 +206,35 @@ namespace
             return false;
 
         const WT_Byte* data = img.data();
-        const WT_Image::WT_Image_Format fmt = img.format();
-        out.resize(static_cast<std::size_t>(w) * static_cast<std::size_t>(h));
+        // format() returns the raw WT_Byte opcode tag, not the enum type.
+        const WT_Byte fmt = img.format();
+        const std::size_t pixel_count = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
+        const WT_Integer32 data_size = img.data_size();
+        out.resize(pixel_count);
 
-        if (fmt == WT_Image::RGBA)
+        if (fmt == static_cast<WT_Byte>(WT_Image::RGBA))
         {
-            for (std::size_t i = 0; i < out.size(); ++i)
+            if (static_cast<std::size_t>(data_size) < pixel_count * 4)
+                return false;
+            for (std::size_t i = 0; i < pixel_count; ++i)
             {
                 const WT_Byte* p = data + i * 4;
                 out[i] = { p[0], p[1], p[2], p[3] };
             }
             return true;
         }
-        if (fmt == WT_Image::RGB)
+        if (fmt == static_cast<WT_Byte>(WT_Image::RGB))
         {
-            for (std::size_t i = 0; i < out.size(); ++i)
+            if (static_cast<std::size_t>(data_size) < pixel_count * 3)
+                return false;
+            for (std::size_t i = 0; i < pixel_count; ++i)
             {
                 const WT_Byte* p = data + i * 3;
                 out[i] = { p[0], p[1], p[2], 255 };
             }
             return true;
         }
-        // Mapped/Group3X/Group4/JPEG etc. need a decoder we do not yet ship.
+        // Mapped/Indexed/Group3X/Group4/JPEG etc. need a decoder we do not yet ship.
         return false;
     }
 
