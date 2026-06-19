@@ -76,7 +76,7 @@ The first renderer supports:
 | `WT_Outline_Ellipse` | Drawn as ellipse outline |
 | `WT_Filled_Ellipse` | Filled ellipse |
 | `WT_Text` | Real glyphs via FreeType when built with `ZS_DWF_WITH_FREETYPE` and a system font is found; otherwise a placeholder box |
-| `WT_Image` | RGB/RGBA, color-mapped/indexed (palette), and JPEG decoded to the page rect; bitonal/Group3X/Group4 fax draw a gray placeholder |
+| `WT_Image` | RGB/RGBA, color-mapped/indexed, JPEG, and bitonal/Group3X fax decoded to the page rect; only Group4X fax draws a gray placeholder |
 | `WT_Viewport` | Clips subsequent drawing to the axis-aligned bounding box of the boundary contour |
 | `WT_Line_Pattern` | Non-solid polyline strokes rendered as approximate dash/dot cadences |
 
@@ -87,7 +87,7 @@ The PNG writer is implemented internally and writes RGBA PNG with uncompressed D
 The renderer is still a minimal W2D renderer. It does **not** yet fully support:
 
 - exact font matching/metrics (FreeType renders ASCII glyphs from a system font; the original CAD font, kerning, rotation and non-ASCII are not matched);
-- bitonal / Group3X / Group4 fax images (`WT_PNG_Group4_Image`) — RGB/RGBA, color-mapped and JPEG are decoded; fax encodings still draw a gray placeholder;
+- Group4X fax and `WT_PNG_Group4_Image` — RGB/RGBA, color-mapped, JPEG and bitonal/Group3X fax are decoded; Group4X still draws a gray placeholder;
 - non-rectangular clipping (viewport clips are approximated by their bounding box);
 - exact line-pattern tables (dash/dot are approximated), fill patterns, hatch patterns, pen patterns;
 - layer visibility controls;

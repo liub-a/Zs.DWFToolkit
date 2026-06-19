@@ -55,6 +55,16 @@ bool write_sample_w2d(const std::string& path)
                    WT_Logical_Point(650, 50), WT_Logical_Point(950, 350), WD_True);
     if (image.serialize(file) != WT_Result::Success) { file.close(); return false; }
 
+    // A bitonal (1 bpp) image: black/white palette, an 8x8 checker. Exercises the
+    // fax-decode path (serialized as Group3X, decoded back via the toolkit).
+    WT_RGBA32 bw[2] = { WT_RGBA32(255, 255, 255, 255), WT_RGBA32(0, 0, 0, 255) };
+    WT_Color_Map bwmap(2, bw, file);
+    WT_Byte bits[8];
+    for (int row = 0; row < 8; ++row) bits[row] = (row % 2) ? 0x0F : 0xF0; // coarse checker
+    WT_Image bitonal(8, 8, WT_Image::Bitonal_Mapped, 2, &bwmap, 8, bits,
+                     WT_Logical_Point(650, 450), WT_Logical_Point(950, 750), WD_True);
+    if (bitonal.serialize(file) != WT_Result::Success) { file.close(); return false; }
+
     return file.close() == WT_Result::Success;
 }
 }

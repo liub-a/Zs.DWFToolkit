@@ -405,6 +405,14 @@ namespace
         if (!c->canvas || !is_visible(file))
             return WT_Result::Success;
 
+        // Fax-coded images (bitonal / Group3X) are decompressed to an 8bpp mapped
+        // image via the toolkit, then decoded through the mapped path below.
+        const WT_Byte ifmt = item.format();
+        if (ifmt == static_cast<WT_Byte>(WT_Image::Bitonal_Mapped))
+            item.convert_bitonal_to_group_3X();
+        if (item.format() == static_cast<WT_Byte>(WT_Image::Group3X_Mapped))
+            item.convert_group_3X_to_mapped();
+
         std::vector<Rgba> pixels;
         int iw = 0, ih = 0;
         if (image_to_rgba(item, pixels, iw, ih))
@@ -413,7 +421,7 @@ namespace
         }
         else
         {
-            // Placeholder for formats we cannot decode yet (mapped/Group4/JPEG).
+            // Placeholder for formats we cannot decode yet (e.g. Group4X fax).
             c->unsupported_count++;
             std::vector<Rgba> gray(1, Rgba{ 220, 220, 220, 255 });
             c->canvas->draw_image(rect, 1, 1, gray);
