@@ -5,15 +5,14 @@ using Zs.DWFToolkit.Models;
 namespace Zs.DWFToolkit.Conversion;
 
 /// <summary>
-/// Converts DWFx/XPS through external document engines and provides best-effort
-/// ordinary DWF fallbacks through native renderer/raster-resource extraction.
+/// Converts DWFx/XPS through external document engines. Plain DWF conversion only succeeds
+/// when a real native W2D/DWF renderer returns full page images; embedded preview/raster
+/// resources and thumbnails are intentionally not treated as successful conversion output.
 /// </summary>
 public sealed class DwfxExternalConverter : IDwfConverter
 {
     private readonly IDwfDocumentReader _reader;
-    private readonly IDwfThumbnailExtractor _thumbnailExtractor;
     private readonly INativeDwfRenderer? _nativeRenderer;
-    private readonly DwfRasterImageExtractor _rasterImageExtractor = new();
 
     public DwfxExternalConverter(
         IDwfDocumentReader? reader = null,
@@ -21,7 +20,7 @@ public sealed class DwfxExternalConverter : IDwfConverter
         INativeDwfRenderer? nativeRenderer = null)
     {
         _reader = reader ?? new Zs.DWFToolkit.Services.DwfDocumentReader();
-        _thumbnailExtractor = thumbnailExtractor ?? new DwfThumbnailExtractor();
+        _ = thumbnailExtractor; // Kept for source compatibility with earlier constructor usage.
         _nativeRenderer = nativeRenderer;
     }
 
@@ -32,8 +31,7 @@ public sealed class DwfxExternalConverter : IDwfConverter
         CancellationToken cancellationToken = default)
     {
         options ??= new DwfRenderOptions();
-        if (!File.Exists(sourcePath))
-            return FileFailure(sourcePath);
+        if (!File.Exists(sourcePath)) return FileFailure(sourcePath);
 
         var info = await _reader.ReadInfoAsync(sourcePath, cancellationToken).ConfigureAwait(false);
         var kind = info.Success ? info.Kind : FileKindDetector.Detect(sourcePath);
@@ -53,49 +51,38 @@ public sealed class DwfxExternalConverter : IDwfConverter
         }
 
         if (kind is DwfFileKind.Dwfx or DwfFileKind.Xps)
-        {
             return await ConvertXpsLikeToPdfAsync(sourcePath, outputPdfPath, options, cancellationToken).ConfigureAwait(false);
-        }
 
         if (!info.Success && kind != DwfFileKind.Dwf)
             return FromInfoFailure(info, sourcePath);
 
-        if (kind == DwfFileKind.Dwf && options.CreatePdfFromImagesFallback)
+        if (kind != DwfFileKind.Dwf)
+            return Unsupported(sourcePath, outputDirectory: null, "Unsupported file kind.");
+
+        if (!options.CreatePdfFromImagesFallback)
+            return Unsupported(sourcePath, outputDirectory: null, "Plain DWF to PDF requires native rendering followed by image-to-PDF assembly.");
+
+        var tempDir = Path.Combine(Path.GetTempPath(), "zs-dwf-toolkit", "pdf", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), "zs-dwf-toolkit", "pdf", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(tempDir);
-            try
+            var imageResult = await ConvertOrdinaryDwfToImagesAsync(sourcePath, tempDir, ForcePdfFriendlyImageOptions(options), info, cancellationToken).ConfigureAwait(false);
+            if (!imageResult.Success || imageResult.OutputFiles.Count == 0)
+                return Unsupported(sourcePath, outputDirectory: null, imageResult.ErrorMessage);
+
+            var pdf = await CreatePdfFromImagesAsync(imageResult.OutputFiles, outputPdfPath, options, cancellationToken).ConfigureAwait(false);
+            pdf.SourcePath = sourcePath;
+            if (pdf.Success)
+                pdf.ErrorMessage ??= "PDF was assembled from native-rendered page images; this is raster output, not vector CAD output.";
+            return pdf;
+        }
+        finally
+        {
+            if (!options.KeepTemporaryFiles)
             {
-                var imageResult = await ConvertOrdinaryDwfToImagesAsync(sourcePath, tempDir, ForcePdfFriendlyImageOptions(options), info, cancellationToken).ConfigureAwait(false);
-                if (imageResult.Success && imageResult.OutputFiles.Count > 0)
-                {
-                    var pdf = await CreatePdfFromImagesAsync(imageResult.OutputFiles, outputPdfPath, options, cancellationToken).ConfigureAwait(false);
-                    pdf.SourcePath = sourcePath;
-                    if (pdf.Success)
-                    {
-                        pdf.ErrorMessage ??= imageResult.ToolName?.Contains("native", StringComparison.OrdinalIgnoreCase) == true
-                            ? null
-                            : "PDF was assembled from rendered/extracted raster images; this may not be drawing-grade vector output.";
-                    }
-                    return pdf;
-                }
-            }
-            finally
-            {
-                if (!options.KeepTemporaryFiles)
-                {
-                    try { Directory.Delete(tempDir, recursive: true); } catch { }
-                }
+                try { Directory.Delete(tempDir, recursive: true); } catch { }
             }
         }
-
-        return new DwfRenderResult
-        {
-            Success = false,
-            ErrorCode = DwfErrorCodes.UnsupportedDwfRendering,
-            ErrorMessage = "Plain DWF to PDF requires a native W2D/DWF renderer. Enable native rendering or use raster/thumbnail fallback.",
-            SourcePath = sourcePath
-        };
     }
 
     public async Task<DwfRenderResult> ConvertToImagesAsync(
@@ -105,61 +92,37 @@ public sealed class DwfxExternalConverter : IDwfConverter
         CancellationToken cancellationToken = default)
     {
         options ??= new DwfRenderOptions();
-        if (!File.Exists(sourcePath))
-            return FileFailure(sourcePath, outputDirectory: outputDirectory);
+        if (!File.Exists(sourcePath)) return FileFailure(sourcePath, outputDirectory: outputDirectory);
 
         var info = await _reader.ReadInfoAsync(sourcePath, cancellationToken).ConfigureAwait(false);
         var kind = info.Success ? info.Kind : FileKindDetector.Detect(sourcePath);
 
         SafePath.EnsureDirectory(outputDirectory);
         if (kind is DwfFileKind.Dwfx or DwfFileKind.Xps)
-        {
             return await ConvertXpsLikeToImagesAsync(sourcePath, outputDirectory, options, cancellationToken).ConfigureAwait(false);
-        }
 
         if (!info.Success && kind != DwfFileKind.Dwf)
-            return FromInfoFailure(info, sourcePath);
+            return FromInfoFailure(info, sourcePath, outputDirectory);
 
         if (kind == DwfFileKind.Dwf)
             return await ConvertOrdinaryDwfToImagesAsync(sourcePath, outputDirectory, options, info, cancellationToken).ConfigureAwait(false);
 
-        return new DwfRenderResult
-        {
-            Success = false,
-            ErrorCode = DwfErrorCodes.UnsupportedFormat,
-            ErrorMessage = "Unsupported file kind.",
-            SourcePath = sourcePath,
-            OutputDirectory = outputDirectory
-        };
+        return Unsupported(sourcePath, outputDirectory, "Unsupported file kind.");
     }
 
-    private async Task<DwfRenderResult> ConvertXpsLikeToPdfAsync(
-        string sourcePath,
-        string outputPdfPath,
-        DwfRenderOptions options,
-        CancellationToken cancellationToken)
+    private async Task<DwfRenderResult> ConvertXpsLikeToPdfAsync(string sourcePath, string outputPdfPath, DwfRenderOptions options, CancellationToken cancellationToken)
     {
         var mutool = ProcessRunner.FindExecutable(options.MutoolPath, "mutool");
         if (mutool != null)
         {
-            var run = await ProcessRunner.RunAsync(
-                mutool,
-                new[] { "convert", "-o", outputPdfPath, sourcePath },
-                options.Timeout,
-                cancellationToken).ConfigureAwait(false);
-
+            var run = await ProcessRunner.RunAsync(mutool, new[] { "convert", "-o", outputPdfPath, sourcePath }, options.Timeout, cancellationToken).ConfigureAwait(false);
             return ExternalPdfResult(run, sourcePath, outputPdfPath, "mutool convert");
         }
 
         var gxps = ProcessRunner.FindExecutable(options.GhostXpsPath, "gxps", "gxpswin64c", "gxpswin32c");
         if (gxps != null)
         {
-            var run = await ProcessRunner.RunAsync(
-                gxps,
-                new[] { "-sDEVICE=pdfwrite", "-dNOPAUSE", "-dBATCH", "-o", outputPdfPath, sourcePath },
-                options.Timeout,
-                cancellationToken).ConfigureAwait(false);
-
+            var run = await ProcessRunner.RunAsync(gxps, new[] { "-sDEVICE=pdfwrite", "-dNOPAUSE", "-dBATCH", "-o", outputPdfPath, sourcePath }, options.Timeout, cancellationToken).ConfigureAwait(false);
             return ExternalPdfResult(run, sourcePath, outputPdfPath, "gxps pdfwrite");
         }
 
@@ -172,11 +135,7 @@ public sealed class DwfxExternalConverter : IDwfConverter
         };
     }
 
-    private async Task<DwfRenderResult> ConvertXpsLikeToImagesAsync(
-        string sourcePath,
-        string outputDirectory,
-        DwfRenderOptions options,
-        CancellationToken cancellationToken)
+    private async Task<DwfRenderResult> ConvertXpsLikeToImagesAsync(string sourcePath, string outputDirectory, DwfRenderOptions options, CancellationToken cancellationToken)
     {
         var imageFormat = NormalizeImageFormat(options.ImageFormat);
         var mutool = ProcessRunner.FindExecutable(options.MutoolPath, "mutool");
@@ -184,29 +143,12 @@ public sealed class DwfxExternalConverter : IDwfConverter
         {
             var pattern = Path.Combine(outputDirectory, $"page-%03d.{imageFormat}");
             var args = new List<string> { "draw", "-r", options.Dpi.ToString(System.Globalization.CultureInfo.InvariantCulture), "-o", pattern };
-
-            if (options.WidthPx.HasValue)
-                args.AddRange(new[] { "-w", options.WidthPx.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) });
-            if (options.HeightPx.HasValue)
-                args.AddRange(new[] { "-h", options.HeightPx.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) });
-
+            if (options.WidthPx.HasValue) args.AddRange(new[] { "-w", options.WidthPx.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+            if (options.HeightPx.HasValue) args.AddRange(new[] { "-h", options.HeightPx.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) });
             args.Add(sourcePath);
 
             var run = await ProcessRunner.RunAsync(mutool, args, options.Timeout, cancellationToken).ConfigureAwait(false);
-            var files = FindOutputImages(outputDirectory, imageFormat);
-
-            return new DwfRenderResult
-            {
-                Success = run.Success && files.Count > 0,
-                ErrorCode = run.Success && files.Count > 0 ? DwfErrorCodes.Ok : run.ErrorCode ?? DwfErrorCodes.ExternalToolFailed,
-                ErrorMessage = run.Success ? null : "mutool draw failed.",
-                SourcePath = sourcePath,
-                OutputDirectory = outputDirectory,
-                OutputFiles = files,
-                ToolName = "mutool draw",
-                StdOut = run.StdOut,
-                StdErr = run.StdErr
-            };
+            return ExternalImageResult(run, sourcePath, outputDirectory, imageFormat, "mutool draw");
         }
 
         var gxps = ProcessRunner.FindExecutable(options.GhostXpsPath, "gxps", "gxpswin64c", "gxpswin32c");
@@ -224,21 +166,9 @@ public sealed class DwfxExternalConverter : IDwfConverter
                 pattern,
                 sourcePath
             };
-            var run = await ProcessRunner.RunAsync(gxps, args, options.Timeout, cancellationToken).ConfigureAwait(false);
-            var files = FindOutputImages(outputDirectory, imageFormat);
 
-            return new DwfRenderResult
-            {
-                Success = run.Success && files.Count > 0,
-                ErrorCode = run.Success && files.Count > 0 ? DwfErrorCodes.Ok : run.ErrorCode ?? DwfErrorCodes.ExternalToolFailed,
-                ErrorMessage = run.Success ? null : "GhostXPS/gxps image conversion failed.",
-                SourcePath = sourcePath,
-                OutputDirectory = outputDirectory,
-                OutputFiles = files,
-                ToolName = $"gxps {device}",
-                StdOut = run.StdOut,
-                StdErr = run.StdErr
-            };
+            var run = await ProcessRunner.RunAsync(gxps, args, options.Timeout, cancellationToken).ConfigureAwait(false);
+            return ExternalImageResult(run, sourcePath, outputDirectory, imageFormat, $"gxps {device}");
         }
 
         return new DwfRenderResult
@@ -285,59 +215,10 @@ public sealed class DwfxExternalConverter : IDwfConverter
             }
         }
 
-        if (options.ExtractRasterImagesFallback)
-        {
-            var files = await _rasterImageExtractor.ExtractAsync(sourcePath, outputDirectory, options, cancellationToken).ConfigureAwait(false);
-            if (files.Count > 0)
-            {
-                return new DwfRenderResult
-                {
-                    Success = true,
-                    ErrorCode = DwfErrorCodes.Ok,
-                    ErrorMessage = "Plain DWF vector rendering is unavailable; extracted embedded raster page/preview resources as fallback.",
-                    SourcePath = sourcePath,
-                    OutputDirectory = outputDirectory,
-                    OutputFiles = files.ToList(),
-                    ToolName = "dwf-raster-resource-extractor"
-                };
-            }
-        }
-
-        if (options.ExtractThumbnailFallback)
-        {
-            var thumbPath = Path.Combine(outputDirectory, $"thumbnail.{imageFormat}");
-            var thumb = await _thumbnailExtractor.ExtractBestThumbnailAsync(sourcePath, thumbPath, cancellationToken).ConfigureAwait(false);
-            if (thumb.Success && thumb.OutputPath != null)
-            {
-                return new DwfRenderResult
-                {
-                    Success = true,
-                    ErrorCode = DwfErrorCodes.Ok,
-                    ErrorMessage = "Plain DWF rendering is unavailable; extracted embedded thumbnail as fallback.",
-                    SourcePath = sourcePath,
-                    OutputDirectory = outputDirectory,
-                    OutputPath = thumb.OutputPath,
-                    OutputFiles = new List<string> { thumb.OutputPath },
-                    ToolName = "thumbnail-fallback"
-                };
-            }
-        }
-
-        return new DwfRenderResult
-        {
-            Success = false,
-            ErrorCode = DwfErrorCodes.UnsupportedDwfRendering,
-            ErrorMessage = "Plain DWF to image requires a native W2D/DWF renderer implementation, or embedded raster/thumbnail resources.",
-            SourcePath = sourcePath,
-            OutputDirectory = outputDirectory
-        };
+        return Unsupported(sourcePath, outputDirectory, "Plain DWF to image requires a real native W2D/DWF renderer. Embedded raster/page-preview resources and thumbnails are intentionally not accepted as conversion output because they are often incomplete.");
     }
 
-    private async Task<DwfRenderResult> CreatePdfFromImagesAsync(
-        IReadOnlyList<string> imageFiles,
-        string outputPdfPath,
-        DwfRenderOptions options,
-        CancellationToken cancellationToken)
+    private async Task<DwfRenderResult> CreatePdfFromImagesAsync(IReadOnlyList<string> imageFiles, string outputPdfPath, DwfRenderOptions options, CancellationToken cancellationToken)
     {
         var mutool = ProcessRunner.FindExecutable(options.MutoolPath, "mutool");
         if (mutool != null)
@@ -345,8 +226,7 @@ public sealed class DwfxExternalConverter : IDwfConverter
             var args = new List<string> { "convert", "-o", outputPdfPath };
             args.AddRange(imageFiles);
             var run = await ProcessRunner.RunAsync(mutool, args, options.Timeout, cancellationToken).ConfigureAwait(false);
-            if (run.Success && File.Exists(outputPdfPath))
-                return ExternalPdfResult(run, string.Empty, outputPdfPath, "images + mutool convert");
+            if (run.Success && File.Exists(outputPdfPath)) return ExternalPdfResult(run, string.Empty, outputPdfPath, "images + mutool convert");
         }
 
         if (SimpleImagePdfWriter.TryWrite(imageFiles, outputPdfPath, options, out var message))
@@ -357,95 +237,107 @@ public sealed class DwfxExternalConverter : IDwfConverter
                 ErrorCode = DwfErrorCodes.Ok,
                 OutputPath = outputPdfPath,
                 OutputFiles = new List<string> { outputPdfPath },
-                ToolName = "simple-image-pdf-writer"
+                ToolName = "simple-image-pdf-writer",
+                ErrorMessage = message
             };
         }
 
         return new DwfRenderResult
         {
             Success = false,
-            ErrorCode = DwfErrorCodes.OutputFailed,
-            ErrorMessage = message ?? "Unable to assemble PDF from images.",
-            OutputPath = outputPdfPath,
-            ToolName = "image-to-pdf"
+            ErrorCode = DwfErrorCodes.ExternalToolNotFound,
+            ErrorMessage = "Could not assemble PDF from images. Install mutool or use JPEG/RGB PNG images supported by the simple writer.",
+            OutputPath = outputPdfPath
         };
     }
 
-    private static DwfRenderOptions ForcePdfFriendlyImageOptions(DwfRenderOptions options)
+    private static DwfRenderOptions ForcePdfFriendlyImageOptions(DwfRenderOptions options) => new()
     {
-        return new DwfRenderOptions
-        {
-            Dpi = options.Dpi,
-            WidthPx = options.WidthPx,
-            HeightPx = options.HeightPx,
-            ImageFormat = "jpg",
-            JpegQuality = options.JpegQuality,
-            Timeout = options.Timeout,
-            MutoolPath = options.MutoolPath,
-            GhostXpsPath = options.GhostXpsPath,
-            PreferNativeDwfRenderer = options.PreferNativeDwfRenderer,
-            ExtractRasterImagesFallback = options.ExtractRasterImagesFallback,
-            RasterImageMinBytes = options.RasterImageMinBytes,
-            SkipThumbnailWhenRasterImagesExist = options.SkipThumbnailWhenRasterImagesExist,
-            ExtractThumbnailFallback = options.ExtractThumbnailFallback,
-            CreatePdfFromImagesFallback = options.CreatePdfFromImagesFallback,
-            PdfPageWidthPoints = options.PdfPageWidthPoints,
-            PdfPageHeightPoints = options.PdfPageHeightPoints,
-            PdfMarginPoints = options.PdfMarginPoints,
-            KeepTemporaryFiles = options.KeepTemporaryFiles,
-            Overwrite = true
-        };
-    }
+        Dpi = options.Dpi,
+        WidthPx = options.WidthPx,
+        HeightPx = options.HeightPx,
+        ImageFormat = "jpg",
+        JpegQuality = options.JpegQuality,
+        Timeout = options.Timeout,
+        MutoolPath = options.MutoolPath,
+        GhostXpsPath = options.GhostXpsPath,
+        PreferNativeDwfRenderer = options.PreferNativeDwfRenderer,
+        CreatePdfFromImagesFallback = options.CreatePdfFromImagesFallback,
+        PdfPageWidthPoints = options.PdfPageWidthPoints,
+        PdfPageHeightPoints = options.PdfPageHeightPoints,
+        PdfMarginPoints = options.PdfMarginPoints,
+        KeepTemporaryFiles = options.KeepTemporaryFiles,
+        Overwrite = true
+    };
 
-    private static DwfRenderResult ExternalPdfResult(ProcessRunResult run, string sourcePath, string outputPdfPath, string toolName)
+    private static DwfRenderResult ExternalPdfResult(ProcessRunResult run, string sourcePath, string outputPdfPath, string toolName) => new()
     {
+        Success = run.Success && File.Exists(outputPdfPath),
+        ErrorCode = run.Success && File.Exists(outputPdfPath) ? DwfErrorCodes.Ok : run.ErrorCode ?? DwfErrorCodes.ExternalToolFailed,
+        ErrorMessage = run.Success ? null : $"{toolName} failed.",
+        SourcePath = sourcePath,
+        OutputPath = outputPdfPath,
+        OutputFiles = File.Exists(outputPdfPath) ? new List<string> { outputPdfPath } : new List<string>(),
+        ToolName = toolName,
+        StdOut = run.StdOut,
+        StdErr = run.StdErr
+    };
+
+    private static DwfRenderResult ExternalImageResult(ProcessRunResult run, string sourcePath, string outputDirectory, string imageFormat, string toolName)
+    {
+        var files = FindOutputImages(outputDirectory, imageFormat);
         return new DwfRenderResult
         {
-            Success = run.Success && File.Exists(outputPdfPath),
-            ErrorCode = run.Success && File.Exists(outputPdfPath) ? DwfErrorCodes.Ok : run.ErrorCode ?? DwfErrorCodes.ExternalToolFailed,
+            Success = run.Success && files.Count > 0,
+            ErrorCode = run.Success && files.Count > 0 ? DwfErrorCodes.Ok : run.ErrorCode ?? DwfErrorCodes.ExternalToolFailed,
             ErrorMessage = run.Success ? null : $"{toolName} failed.",
             SourcePath = sourcePath,
-            OutputPath = outputPdfPath,
-            OutputFiles = File.Exists(outputPdfPath) ? new List<string> { outputPdfPath } : new List<string>(),
+            OutputDirectory = outputDirectory,
+            OutputFiles = files,
             ToolName = toolName,
             StdOut = run.StdOut,
             StdErr = run.StdErr
         };
     }
 
-    private static DwfRenderResult FromInfoFailure(DwfDocumentInfo info, string sourcePath) => new()
+    private static DwfRenderResult Unsupported(string sourcePath, string? outputDirectory, string? message) => new()
     {
         Success = false,
-        ErrorCode = info.ErrorCode,
-        ErrorMessage = info.ErrorMessage,
-        SourcePath = sourcePath
+        ErrorCode = DwfErrorCodes.UnsupportedDwfRendering,
+        ErrorMessage = message ?? "Unsupported DWF rendering.",
+        SourcePath = sourcePath,
+        OutputDirectory = outputDirectory
     };
 
     private static DwfRenderResult FileFailure(string sourcePath, string? outputDirectory = null) => new()
     {
         Success = false,
         ErrorCode = DwfErrorCodes.FileNotFound,
-        ErrorMessage = "File not found.",
+        ErrorMessage = "Source file not found.",
         SourcePath = sourcePath,
         OutputDirectory = outputDirectory
     };
 
-    private static List<string> FindOutputImages(string outputDirectory, string imageFormat)
+    private static DwfRenderResult FromInfoFailure(DwfDocumentInfo info, string sourcePath, string? outputDirectory = null) => new()
     {
-        return Directory.Exists(outputDirectory)
-            ? Directory.GetFiles(outputDirectory, $"page-*.{imageFormat}").OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList()
-            : new List<string>();
-    }
+        Success = false,
+        ErrorCode = info.ErrorCode ?? DwfErrorCodes.ReadFailed,
+        ErrorMessage = info.ErrorMessage,
+        SourcePath = sourcePath,
+        OutputDirectory = outputDirectory
+    };
 
     private static string NormalizeImageFormat(string? format)
     {
-        var f = (format ?? "png").Trim().TrimStart('.').ToLowerInvariant();
-        return f switch
-        {
-            "jpg" => "jpg",
-            "jpeg" => "jpg",
-            "png" => "png",
-            _ => "png"
-        };
+        var f = string.IsNullOrWhiteSpace(format) ? "png" : format.Trim().TrimStart('.').ToLowerInvariant();
+        return f is "jpeg" ? "jpg" : f;
+    }
+
+    private static List<string> FindOutputImages(string outputDirectory, string imageFormat)
+    {
+        if (!Directory.Exists(outputDirectory)) return new List<string>();
+        return Directory.EnumerateFiles(outputDirectory, $"*.{imageFormat}", SearchOption.TopDirectoryOnly)
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 }
