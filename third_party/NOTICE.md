@@ -9,8 +9,10 @@ Vendored in-tree and built from source (no network at build time):
 | zlib      | 1.3.1   | `zlib/`            | zlib license (© Jean-loup Gailly / Mark Adler) |
 | DejaVu Sans | —     | `fonts/DejaVuSans.ttf` | Bitstream Vera + Arev (free, embeddable) — see `fonts/NOTICE.md` |
 
-libjpeg (IJG, libjpeg-6b API) is built from the sources the ODA toolkit bundles
-under `DWFToolkit-7.7/.../w3dtk/jpeg`, so it is not separately committed.
+libjpeg: by default the build uses the system libjpeg/jpeg-turbo when available
+(faster, SIMD). When none is found — or with `-DZS_DWF_PREFER_SYSTEM_JPEG=OFF` — it
+falls back to building the libjpeg-6b sources the ODA toolkit bundles under
+`DWFToolkit-7.7/.../w3dtk/jpeg`, so the build still needs no system jpeg.
 
 FreeType is used under the FTL. Required attribution:
 
