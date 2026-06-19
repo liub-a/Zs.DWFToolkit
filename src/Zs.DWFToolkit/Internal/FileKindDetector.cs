@@ -7,11 +7,9 @@ internal static class FileKindDetector
 {
     public static bool IsZipBased(string path)
     {
-        Span<byte> sig = stackalloc byte[4];
-        using var stream = File.OpenRead(path);
-        if (stream.Read(sig) < 4)
-            return false;
-        return sig[0] == 0x50 && sig[1] == 0x4B;
+        // Classic DWF v6+ packages prefix the ZIP with an ASCII "(DWF V06.20)"
+        // header, so the PK signature is not always at byte 0.
+        return DwfPackage.FindZipOffset(path) >= 0;
     }
 
     public static DwfFileKind Detect(string path)
@@ -28,7 +26,7 @@ internal static class FileKindDetector
         if (!IsZipBased(path)) return extensionKind;
         try
         {
-            using var archive = ZipFile.OpenRead(path);
+            using var archive = DwfPackage.OpenRead(path);
             var names = archive.Entries.Select(e => e.FullName.Replace('\\', '/')).ToArray();
             if (names.Any(n => n.Equals("[Content_Types].xml", StringComparison.OrdinalIgnoreCase)))
             {

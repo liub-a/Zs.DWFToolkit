@@ -32,7 +32,7 @@ public sealed class DwfThumbnailExtractor : IDwfThumbnailExtractor
             };
         }
 
-        using var archive = ZipFile.OpenRead(sourcePath);
+        using var archive = DwfPackage.OpenRead(sourcePath);
         var candidates = archive.Entries
             .Where(e => !string.IsNullOrEmpty(e.Name))
             .Select(e => new { Entry = e, Info = PackageEntryClassifier.ToInfo(e) })

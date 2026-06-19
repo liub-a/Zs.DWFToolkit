@@ -47,7 +47,7 @@ public sealed class DwfDocumentReader : IDwfDocumentReader
                 return Task.FromResult(info);
             }
 
-            using var archive = ZipFile.OpenRead(sourcePath);
+            using var archive = DwfPackage.OpenRead(sourcePath);
             info.Entries = archive.Entries
                 .Where(e => !string.IsNullOrEmpty(e.Name))
                 .Select(PackageEntryClassifier.ToInfo)
