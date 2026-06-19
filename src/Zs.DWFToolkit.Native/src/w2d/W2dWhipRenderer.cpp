@@ -476,7 +476,9 @@ RenderResult render_w2d_file_to_png(
     collector.bounds.min_y -= dy;
     collector.bounds.max_y += dy;
 
-    RasterCanvas canvas(width_px, height_px, collector.bounds);
+    // Supersample: render into a 2x canvas and box-downsample for anti-aliasing.
+    const int ss = 2;
+    RasterCanvas canvas(width_px * ss, height_px * ss, collector.bounds);
     zs::dwf::text::TextRenderer text_renderer;
     W2dContext painter;
     painter.collecting = false;
@@ -490,11 +492,16 @@ RenderResult render_w2d_file_to_png(
         return RenderResult{false, 1007, "w2d_render_failed", "Failed to render W2D stream: " + name, ""};
     }
 
+    const auto final_pixels = downsample_box(canvas.pixels(), width_px * ss, height_px * ss, ss);
     std::string png_error;
-    if (!write_png_rgba(output_path, width_px, height_px, canvas.pixels(), png_error))
+    if (!write_png_rgba(output_path, width_px, height_px, final_pixels, png_error))
     {
         return RenderResult{false, 1008, "output_failed", png_error, ""};
     }
+    // Transform maps drawing coords to FINAL (downsampled) pixels.
+    const double final_scale = canvas.scale() / ss;
+    const double final_offx = canvas.offset_x() / ss;
+    const double final_offy = canvas.offset_y() / ss;
 
     std::ostringstream json;
     json << "{"
@@ -522,10 +529,10 @@ RenderResult render_w2d_file_to_png(
          << "\"unit\":\"dwf_internal\","
          << "\"imageWidth\":" << width_px << ","
          << "\"imageHeight\":" << height_px << ","
-         << "\"scaleX\":" << canvas.scale() << ","
-         << "\"scaleY\":" << canvas.scale() << ","
-         << "\"offsetX\":" << canvas.offset_x() << ","
-         << "\"offsetY\":" << canvas.offset_y() << ","
+         << "\"scaleX\":" << final_scale << ","
+         << "\"scaleY\":" << final_scale << ","
+         << "\"offsetX\":" << final_offx << ","
+         << "\"offsetY\":" << final_offy << ","
          << "\"flipY\":true},"
          << "\"bounds\":{"
          << "\"minX\":" << collector.bounds.min_x << ","

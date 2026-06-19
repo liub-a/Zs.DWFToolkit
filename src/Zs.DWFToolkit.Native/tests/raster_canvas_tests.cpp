@@ -2,6 +2,7 @@
 // required, so these run in the default native build. Each EXPECT records a
 // failure; main returns non-zero if any fail so CTest reports the result.
 #include "render/RasterCanvas.h"
+#include "render/MinimalPng.h"
 
 #include <cstdio>
 #include <string>
@@ -141,6 +142,17 @@ int main()
         const auto& half = pixel_at(c, 51, 50);
         expect(half.r > 100 && half.r < 200, "blend_coverage half coverage blends toward background");
         expect(is_color(pixel_at(c, 50, 51), 255, 255, 255), "blend_coverage zero coverage leaves background");
+    }
+
+    // Box downsample averages blocks: a 2x2 black/white checker becomes mid-gray.
+    {
+        std::vector<Rgba> src = {
+            Rgba{0,0,0,255},     Rgba{255,255,255,255},
+            Rgba{255,255,255,255}, Rgba{0,0,0,255},
+        };
+        auto dst = downsample_box(src, 2, 2, 2);
+        expect(dst.size() == 1, "downsample 2x2 -> 1 pixel");
+        expect(dst[0].r > 100 && dst[0].r < 160, "downsample averages to mid-gray (anti-aliasing)");
     }
 
     if (g_failures == 0)

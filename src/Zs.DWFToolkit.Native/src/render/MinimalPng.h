@@ -20,4 +20,9 @@ bool write_png_rgba(const std::string& path, int width, int height, const std::v
 // blocks). Intended for tests/regression; not a general-purpose PNG decoder.
 bool read_png_rgba(const std::string& path, int& width, int& height, std::vector<Rgba>& pixels, std::string& error);
 
+// Box-downsamples a (w x h) image by an integer factor, averaging each factor x
+// factor block. Used for supersampled anti-aliasing. w and h must be multiples of
+// factor. Returns the (w/factor x h/factor) image.
+std::vector<Rgba> downsample_box(const std::vector<Rgba>& src, int w, int h, int factor);
+
 } // namespace zs::dwf::native_render

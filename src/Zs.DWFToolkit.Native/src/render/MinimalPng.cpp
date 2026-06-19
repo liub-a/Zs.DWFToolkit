@@ -249,4 +249,34 @@ bool read_png_rgba(const std::string& path, int& width, int& height, std::vector
     return true;
 }
 
+std::vector<Rgba> downsample_box(const std::vector<Rgba>& src, int w, int h, int factor)
+{
+    if (factor <= 1 || w <= 0 || h <= 0)
+        return src;
+    const int dw = w / factor;
+    const int dh = h / factor;
+    std::vector<Rgba> dst(static_cast<std::size_t>(dw) * static_cast<std::size_t>(dh));
+    const int n = factor * factor;
+    for (int dy = 0; dy < dh; ++dy)
+    {
+        for (int dx = 0; dx < dw; ++dx)
+        {
+            unsigned int r = 0, g = 0, b = 0, a = 0;
+            for (int sy = 0; sy < factor; ++sy)
+            {
+                const std::size_t row = static_cast<std::size_t>(dy * factor + sy) * static_cast<std::size_t>(w);
+                for (int sx = 0; sx < factor; ++sx)
+                {
+                    const Rgba& p = src[row + static_cast<std::size_t>(dx * factor + sx)];
+                    r += p.r; g += p.g; b += p.b; a += p.a;
+                }
+            }
+            dst[static_cast<std::size_t>(dy) * static_cast<std::size_t>(dw) + static_cast<std::size_t>(dx)] =
+                Rgba{ static_cast<std::uint8_t>(r / n), static_cast<std::uint8_t>(g / n),
+                      static_cast<std::uint8_t>(b / n), static_cast<std::uint8_t>(a / n) };
+        }
+    }
+    return dst;
+}
+
 } // namespace zs::dwf::native_render
