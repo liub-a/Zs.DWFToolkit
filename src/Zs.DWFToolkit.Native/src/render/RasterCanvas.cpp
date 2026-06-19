@@ -415,6 +415,13 @@ void RasterCanvas::blend_coverage(int dst_x, int dst_y, const std::uint8_t* cove
     }
 }
 
+void RasterCanvas::fill_marker(PointD center, int radius_px, Rgba color)
+{
+    const auto p = to_pixel(center);
+    draw_disc(static_cast<int>(std::llround(p.x)), static_cast<int>(std::llround(p.y)),
+              std::max(1, radius_px), color);
+}
+
 void RasterCanvas::draw_text_marker(PointD position, int glyph_count, Rgba color, int thickness)
 {
     const int len = std::max(1, glyph_count);

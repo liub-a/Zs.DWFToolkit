@@ -73,6 +73,9 @@ public:
     void draw_ellipse(PointD center, double radius_x, double radius_y, double tilt_rad, Rgba color, int thickness);
     void fill_ellipse(PointD center, double radius_x, double radius_y, double tilt_rad, Rgba color);
     void draw_text_marker(PointD position, int glyph_count, Rgba color, int thickness);
+    // Draws a filled disc of radius_px pixels centred at the given logical point
+    // (screen-constant size). Used for polymarkers.
+    void fill_marker(PointD center, int radius_px, Rgba color);
 
     // Alpha-composites an 8-bit coverage bitmap (e.g. a FreeType glyph) at pixel
     // (dst_x, dst_y) top-left, using `color` modulated by per-pixel coverage.

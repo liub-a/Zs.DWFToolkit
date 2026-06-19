@@ -157,6 +157,14 @@ int main()
         expect(is_color(pixel_at(c, 50, 50), 255, 255, 255), "contour hole stays background");
     }
 
+    // fill_marker paints a small disc centred at a logical point.
+    {
+        RasterCanvas c(100, 100, unit_box());
+        c.fill_marker({50, 50}, 3, blue);
+        expect(is_color(pixel_at(c, 50, 50), 0, 0, 255), "marker center painted");
+        expect(is_color(pixel_at(c, 90, 90), 255, 255, 255), "marker is local, not full-canvas");
+    }
+
     // Box downsample averages blocks: a 2x2 black/white checker becomes mid-gray.
     {
         std::vector<Rgba> src = {
