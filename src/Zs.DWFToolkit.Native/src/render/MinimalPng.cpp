@@ -1,7 +1,9 @@
 #include "MinimalPng.h"
 #include <array>
 #include <fstream>
+#include <iterator>
 #include <limits>
+#include <string>
 
 namespace zs::dwf::native_render
 {
@@ -159,6 +161,90 @@ bool write_png_rgba(const std::string& path, int width, int height, const std::v
     {
         error = "failed to write PNG file";
         return false;
+    }
+    return true;
+}
+
+namespace
+{
+    std::uint32_t read_u32_be(const std::uint8_t* p)
+    {
+        return (static_cast<std::uint32_t>(p[0]) << 24) | (static_cast<std::uint32_t>(p[1]) << 16) |
+               (static_cast<std::uint32_t>(p[2]) << 8) | static_cast<std::uint32_t>(p[3]);
+    }
+
+    // Inflates the zlib stored-block stream produced by zlib_store_blocks.
+    bool inflate_stored(const std::vector<std::uint8_t>& z, std::vector<std::uint8_t>& out, std::string& error)
+    {
+        if (z.size() < 2) { error = "zlib stream too short"; return false; }
+        std::size_t i = 2; // skip CMF/FLG
+        for (;;)
+        {
+            if (i + 5 > z.size()) { error = "truncated deflate block header"; return false; }
+            const std::uint8_t bfinal_btype = z[i++];
+            if ((bfinal_btype & 0x06) != 0) { error = "only stored deflate blocks are supported"; return false; }
+            const std::uint16_t len = static_cast<std::uint16_t>(z[i] | (z[i + 1] << 8));
+            i += 4; // len + nlen
+            if (i + len > z.size()) { error = "truncated stored block data"; return false; }
+            out.insert(out.end(), z.begin() + static_cast<std::ptrdiff_t>(i), z.begin() + static_cast<std::ptrdiff_t>(i + len));
+            i += len;
+            if ((bfinal_btype & 0x01) != 0) break;
+        }
+        return true;
+    }
+}
+
+bool read_png_rgba(const std::string& path, int& width, int& height, std::vector<Rgba>& pixels, std::string& error)
+{
+    std::ifstream in(path, std::ios::binary);
+    if (!in) { error = "failed to open PNG"; return false; }
+    std::vector<std::uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    if (data.size() < 8 || data[0] != 0x89 || data[1] != 'P') { error = "not a PNG"; return false; }
+
+    std::size_t pos = 8;
+    std::vector<std::uint8_t> idat;
+    width = height = 0;
+    while (pos + 8 <= data.size())
+    {
+        const std::uint32_t len = read_u32_be(&data[pos]);
+        const char* type = reinterpret_cast<const char*>(&data[pos + 4]);
+        const std::size_t body = pos + 8;
+        if (body + len + 4 > data.size()) { error = "truncated chunk"; return false; }
+        if (std::string(type, 4) == "IHDR")
+        {
+            width = static_cast<int>(read_u32_be(&data[body]));
+            height = static_cast<int>(read_u32_be(&data[body + 4]));
+        }
+        else if (std::string(type, 4) == "IDAT")
+        {
+            idat.insert(idat.end(), data.begin() + static_cast<std::ptrdiff_t>(body), data.begin() + static_cast<std::ptrdiff_t>(body + len));
+        }
+        else if (std::string(type, 4) == "IEND")
+        {
+            break;
+        }
+        pos = body + len + 4; // skip data + CRC
+    }
+
+    if (width <= 0 || height <= 0) { error = "missing IHDR"; return false; }
+
+    std::vector<std::uint8_t> raw;
+    if (!inflate_stored(idat, raw, error)) return false;
+
+    const std::size_t stride = 1 + static_cast<std::size_t>(width) * 4;
+    if (raw.size() < stride * static_cast<std::size_t>(height)) { error = "decoded data too small"; return false; }
+
+    pixels.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+    for (int y = 0; y < height; ++y)
+    {
+        const std::uint8_t* row = raw.data() + static_cast<std::size_t>(y) * stride;
+        if (row[0] != 0) { error = "unsupported PNG row filter"; return false; }
+        for (int x = 0; x < width; ++x)
+        {
+            const std::uint8_t* p = row + 1 + static_cast<std::size_t>(x) * 4;
+            pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] =
+                Rgba{ p[0], p[1], p[2], p[3] };
+        }
     }
     return true;
 }

@@ -109,6 +109,7 @@ if(ZS_DWF_BUILD_TESTS)
         add_executable(w2d_roundtrip_tests tests/w2d_roundtrip_tests.cpp)
         target_include_directories(w2d_roundtrip_tests PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/compat/oda
             ${CMAKE_CURRENT_SOURCE_DIR}/compat/oda/Include
             ${ZS_DWF_ODA_DWFTK_ROOT}/develop/global/src

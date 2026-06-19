@@ -16,4 +16,8 @@ struct Rgba
 
 bool write_png_rgba(const std::string& path, int width, int height, const std::vector<Rgba>& pixels, std::string& error);
 
+// Reads back a PNG written by write_png_rgba (8-bit RGBA, filter 0, zlib stored
+// blocks). Intended for tests/regression; not a general-purpose PNG decoder.
+bool read_png_rgba(const std::string& path, int& width, int& height, std::vector<Rgba>& pixels, std::string& error);
+
 } // namespace zs::dwf::native_render

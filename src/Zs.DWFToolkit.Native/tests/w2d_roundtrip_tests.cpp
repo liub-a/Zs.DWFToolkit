@@ -3,11 +3,15 @@
 // This exercises the actual WT_File parsing + W2dWhipRenderer path end to end.
 #include "whiptk/whip_toolkit.h"
 #include "zs_dwf_toolkit_native.h"
+#include "render/MinimalPng.h"
 
 #include <cstdio>
 #include <filesystem>
 #include <string>
 #include <vector>
+
+using zs::dwf::native_render::Rgba;
+using zs::dwf::native_render::read_png_rgba;
 
 namespace
 {
@@ -68,6 +72,27 @@ int main()
     expect(j.find("\"success\":true") != std::string::npos, "render JSON reports success");
     expect(j.find("\"polyline\":1") != std::string::npos, "render JSON counts the polyline");
     expect(j.find("\"transform\"") != std::string::npos, "render JSON includes a transform");
+
+    // Pixel regression: decode the PNG and verify the drawing is actually painted
+    // (guards against the white-on-white / blank-output class of bug) while the
+    // corners stay background-white.
+    int w = 0, h = 0;
+    std::vector<Rgba> px;
+    std::string perr;
+    if (read_png_rgba(png, w, h, px, perr))
+    {
+        expect(w == 200 && h == 200, "decoded PNG is 200x200");
+        int dark = 0;
+        for (const auto& p : px)
+            if (p.r < 64 && p.g < 64 && p.b < 64) ++dark;
+        expect(dark > 100, std::string("rendered geometry produces black pixels (got ") + std::to_string(dark) + ")");
+        const Rgba corner = px.front();
+        expect(corner.r > 200 && corner.g > 200 && corner.b > 200, "top-left corner stays background white");
+    }
+    else
+    {
+        expect(false, std::string("read_png_rgba failed: ") + perr);
+    }
 
     if (g_failures == 0) { std::printf("W2D round-trip test passed.\n"); return 0; }
     std::printf("%d W2D round-trip assertion(s) failed.\n", g_failures);
