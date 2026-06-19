@@ -72,9 +72,9 @@ jobs:
 
       - name: Install build tools
         # W3dTk needs libjpeg + zlib; verified to build+link locally on macOS.
-        # FreeType + font are vendored (FetchContent + embedded TTF); only W3dTk's
-        # jpeg/zlib remain as system deps.
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ unzip libjpeg-dev zlib1g-dev
+        # All third-party libs (FreeType, libtiff, zlib, libjpeg) are vendored and
+        # built from source; only a C/C++ toolchain is needed.
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ unzip
 
       - name: Import ODA-modified DWF Toolkit source
         run: ./scripts/setup-oda-dwftoolkit.sh

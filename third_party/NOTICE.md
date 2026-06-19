@@ -6,7 +6,11 @@ Vendored in-tree and built from source (no network at build time):
 |-----------|---------|------|---------|
 | FreeType  | 2.13.3  | `freetype/`        | FreeType License (FTL) / GPLv2 dual |
 | libtiff   | 4.6.0   | `libtiff/`         | libtiff license (BSD-style, © Sam Leffler / SGI) |
+| zlib      | 1.3.1   | `zlib/`            | zlib license (© Jean-loup Gailly / Mark Adler) |
 | DejaVu Sans | —     | `fonts/DejaVuSans.ttf` | Bitstream Vera + Arev (free, embeddable) — see `fonts/NOTICE.md` |
+
+libjpeg (IJG, libjpeg-6b API) is built from the sources the ODA toolkit bundles
+under `DWFToolkit-7.7/.../w3dtk/jpeg`, so it is not separately committed.
 
 FreeType is used under the FTL. Required attribution:
 

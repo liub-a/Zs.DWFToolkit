@@ -111,11 +111,28 @@ if(ZS_DWF_ENABLE_ODA_DWFTK)
         ${ZS_DWF_ODA_DWFTK_ROOT}
     )
 
-    # W3dTk's BOpcodeHandler.cpp includes <jpeglib.h>, but the bundled ODA CMake
-    # never adds the directory that holds the vendored libjpeg headers. Inject it
-    # here (directory-scoped, so it propagates into the add_subdirectory tree below)
-    # so W3dTk compiles. DwfToolkit references W3dTk symbols, so it must be built.
-    include_directories("${ZS_DWF_ODA_DWFTK_ROOT}/develop/global/src/dwf/w3dtk/jpeg")
+    # W3dTk pulls in zlib and libjpeg symbols and DwfToolkit references W3dTk, so
+    # both must be built. To avoid any system dependency:
+    #  - zlib is vendored in-tree (third_party/zlib 1.3.1, static).
+    #  - libjpeg is built from the libjpeg-6b sources the ODA toolkit already bundles
+    #    under w3dtk/jpeg (same jpeglib.h W3dTk compiles against -> consistent ABI).
+    set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/zlib" "${CMAKE_BINARY_DIR}/zlib" EXCLUDE_FROM_ALL)
+
+    set(ODA_JPEG_DIR "${ZS_DWF_ODA_DWFTK_ROOT}/develop/global/src/dwf/w3dtk/jpeg")
+    file(GLOB ODA_JPEG_SRC "${ODA_JPEG_DIR}/*.c")
+    # Keep one memory backend (jmemnobs); drop the platform-specific alternatives.
+    list(FILTER ODA_JPEG_SRC EXCLUDE REGEX "jmem(ansi|dos|mac|name)\\.c$")
+    add_library(oda_jpeg STATIC ${ODA_JPEG_SRC})
+    target_include_directories(oda_jpeg PUBLIC "${ODA_JPEG_DIR}")
+    set_target_properties(oda_jpeg PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+    # W3dTk's own TUs include <jpeglib.h> + zlib.h; put both on the global path.
+    include_directories(
+        "${ODA_JPEG_DIR}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/zlib"
+        "${CMAKE_BINARY_DIR}/zlib"
+    )
 
     # Add the Toolkit after the main shared library is declared so failures are
     # isolated behind the ZS_DWF_ENABLE_ODA_DWFTK option. If your platform still
@@ -138,15 +155,8 @@ if(ZS_DWF_ENABLE_ODA_DWFTK)
         target_link_libraries(zs_dwf_toolkit_native PRIVATE W3dTk)
     endif()
 
-    # W3dTk pulls in libjpeg and zlib symbols. The toolkit ships jpeg headers but
-    # its bundled CMake builds neither library, so link the system ones (Homebrew
-    # jpeg-turbo on macOS; libjpeg-dev / zlib1g-dev on Linux CI).
-    if(APPLE)
-        list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/jpeg-turbo /usr/local/opt/jpeg-turbo)
-    endif()
-    find_package(ZLIB REQUIRED)
-    find_package(JPEG REQUIRED)
-    target_link_libraries(zs_dwf_toolkit_native PRIVATE ZLIB::ZLIB JPEG::JPEG)
+    # Link the vendored static zlib + libjpeg (W3dTk pulls in their symbols).
+    target_link_libraries(zs_dwf_toolkit_native PRIVATE oda_jpeg zlibstatic)
 endif()
 
 if(ZS_DWF_BUILD_TESTS)
@@ -181,7 +191,7 @@ if(ZS_DWF_BUILD_TESTS)
         if(TARGET W3dTk)
             target_link_libraries(w2d_roundtrip_tests PRIVATE W3dTk)
         endif()
-        target_link_libraries(w2d_roundtrip_tests PRIVATE ZLIB::ZLIB JPEG::JPEG)
+        target_link_libraries(w2d_roundtrip_tests PRIVATE oda_jpeg zlibstatic)
         add_test(NAME w2d_roundtrip_tests COMMAND w2d_roundtrip_tests)
 
         # Regression against the public ocean_90.w2d sample (path via ZS_DWF_OCEAN_W2D;
