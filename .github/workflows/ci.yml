@@ -72,16 +72,19 @@ jobs:
 
       - name: Install build tools
         # W3dTk needs libjpeg + zlib; verified to build+link locally on macOS.
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ unzip libjpeg-dev zlib1g-dev
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ unzip libjpeg-dev zlib1g-dev libfreetype6-dev fonts-dejavu-core
 
       - name: Import ODA-modified DWF Toolkit source
         run: ./scripts/setup-oda-dwftoolkit.sh
 
-      - name: Configure + build (ZS_DWF_ENABLE_ODA_DWFTK=ON)
+      - name: Configure + build (ODA + FreeType + tests)
         run: |
-          cmake -S src/Zs.DWFToolkit.Native -B build/native-oda -DZS_DWF_ENABLE_ODA_DWFTK=ON -DCMAKE_BUILD_TYPE=Release
+          cmake -S src/Zs.DWFToolkit.Native -B build/native-oda -DZS_DWF_ENABLE_ODA_DWFTK=ON -DZS_DWF_WITH_FREETYPE=ON -DZS_DWF_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
           # Bounded parallelism: each WhipTk TU needs ~GBs; -j unbounded OOM-kills the runner.
-          cmake --build build/native-oda --target zs_dwf_toolkit_native --config Release -j 2
+          cmake --build build/native-oda --config Release -j 2
+
+      - name: Run native tests (RasterCanvas + W2D round-trip)
+        run: ctest --test-dir build/native-oda --output-on-failure
 
       - name: Upload library
         if: success()
