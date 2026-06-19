@@ -12,6 +12,11 @@
 #ifdef ZS_DWF_WITH_ODA_DWFTK
 #include "whiptk/whip_toolkit.h"
 #include "../text/TextRenderer.h"
+#include <csetjmp>
+#include <cstdio>
+extern "C" {
+#include <jpeglib.h>
+}
 #endif
 
 namespace zs::dwf::w2d
@@ -255,9 +260,76 @@ namespace
         return WT_Result::Success;
     }
 
-    // Reads the four bytes of a WT_Image pixel as RGBA, tolerating the common
-    // WHIP image formats. Returns false for formats whose raw bytes we cannot map
-    // directly (compressed/mapped); the caller then falls back to a placeholder.
+    struct JpegErrorMgr { jpeg_error_mgr base; std::jmp_buf jmp; };
+    void jpeg_error_exit(j_common_ptr cinfo) { std::longjmp(reinterpret_cast<JpegErrorMgr*>(cinfo->err)->jmp, 1); }
+
+    // Minimal in-memory libjpeg source manager (the bundled libjpeg predates
+    // jpeg_mem_src, so we supply our own).
+    void jpeg_mem_init(j_decompress_ptr) {}
+    boolean jpeg_mem_fill(j_decompress_ptr cinfo)
+    {
+        // The whole buffer is provided up front; signal EOI on any further read.
+        static const JOCTET eoi[2] = { 0xFF, JPEG_EOI };
+        cinfo->src->next_input_byte = eoi;
+        cinfo->src->bytes_in_buffer = 2;
+        return TRUE;
+    }
+    void jpeg_mem_skip(j_decompress_ptr cinfo, long num_bytes)
+    {
+        if (num_bytes <= 0) return;
+        if (static_cast<size_t>(num_bytes) > cinfo->src->bytes_in_buffer)
+            num_bytes = static_cast<long>(cinfo->src->bytes_in_buffer);
+        cinfo->src->next_input_byte += num_bytes;
+        cinfo->src->bytes_in_buffer -= static_cast<size_t>(num_bytes);
+    }
+    void jpeg_mem_term(j_decompress_ptr) {}
+
+    // Decodes a JPEG byte buffer into RGBA. Returns false on any libjpeg error.
+    bool decode_jpeg(const WT_Byte* data, std::size_t size, std::vector<Rgba>& out, int& w, int& h)
+    {
+        jpeg_decompress_struct cinfo{};
+        JpegErrorMgr err{};
+        cinfo.err = jpeg_std_error(&err.base);
+        err.base.error_exit = jpeg_error_exit;
+        if (setjmp(err.jmp)) { jpeg_destroy_decompress(&cinfo); return false; }
+
+        jpeg_create_decompress(&cinfo);
+        jpeg_source_mgr src{};
+        src.init_source = jpeg_mem_init;
+        src.fill_input_buffer = jpeg_mem_fill;
+        src.skip_input_data = jpeg_mem_skip;
+        src.resync_to_restart = jpeg_resync_to_restart;
+        src.term_source = jpeg_mem_term;
+        src.next_input_byte = reinterpret_cast<const JOCTET*>(data);
+        src.bytes_in_buffer = size;
+        cinfo.src = &src;
+        if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) { jpeg_destroy_decompress(&cinfo); return false; }
+        cinfo.out_color_space = JCS_RGB;
+        jpeg_start_decompress(&cinfo);
+
+        w = static_cast<int>(cinfo.output_width);
+        h = static_cast<int>(cinfo.output_height);
+        const int comps = cinfo.output_components; // 3 for RGB
+        out.resize(static_cast<std::size_t>(w) * static_cast<std::size_t>(h));
+        std::vector<unsigned char> scan(static_cast<std::size_t>(w) * static_cast<std::size_t>(comps));
+        for (int y = 0; cinfo.output_scanline < cinfo.output_height; ++y)
+        {
+            unsigned char* rowp = scan.data();
+            jpeg_read_scanlines(&cinfo, &rowp, 1);
+            for (int x = 0; x < w; ++x)
+            {
+                const unsigned char* p = scan.data() + static_cast<std::size_t>(x) * comps;
+                out[static_cast<std::size_t>(y) * w + x] = Rgba{ p[0], p[1], p[2], 255 };
+            }
+        }
+        jpeg_finish_decompress(&cinfo);
+        jpeg_destroy_decompress(&cinfo);
+        return true;
+    }
+
+    // Reads a WT_Image into RGBA, handling raw RGB/RGBA, color-mapped/indexed, and
+    // JPEG. Returns false for formats we cannot decode (bitonal/Group3X/Group4),
+    // so the caller falls back to a placeholder.
     bool image_to_rgba(const WT_Image& img, std::vector<Rgba>& out, int& w, int& h)
     {
         w = img.columns();
@@ -294,7 +366,24 @@ namespace
             }
             return true;
         }
-        // Mapped/Indexed/Group3X/Group4/JPEG etc. need a decoder we do not yet ship.
+        if (fmt == static_cast<WT_Byte>(WT_Image::Mapped) ||
+            fmt == static_cast<WT_Byte>(WT_Image::Indexed))
+        {
+            const WT_Color_Map* cm = img.color_map();
+            if (!cm || static_cast<std::size_t>(data_size) < pixel_count)
+                return false;
+            for (std::size_t i = 0; i < pixel_count; ++i)
+            {
+                const WT_RGBA32 c = cm->map(data[i]);
+                out[i] = { c.m_rgb.r, c.m_rgb.g, c.m_rgb.b, c.m_rgb.a };
+            }
+            return true;
+        }
+        if (fmt == static_cast<WT_Byte>(WT_Image::JPEG))
+        {
+            return decode_jpeg(data, static_cast<std::size_t>(data_size), out, w, h);
+        }
+        // Bitonal/Group3X/Group4 fax encodings still need a decoder we do not ship.
         return false;
     }
 

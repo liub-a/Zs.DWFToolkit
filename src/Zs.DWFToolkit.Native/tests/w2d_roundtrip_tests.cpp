@@ -46,6 +46,15 @@ bool write_sample_w2d(const std::string& path)
     WT_Text text(WT_Logical_Point(120, 500), WT_String("ABC"));
     if (text.serialize(file) != WT_Result::Success) { file.close(); return false; }
 
+    // A 2x2 color-mapped image (red/blue) in the lower-right, to exercise the
+    // mapped-image decode path end to end.
+    WT_RGBA32 palette[2] = { WT_RGBA32(255, 0, 0, 255), WT_RGBA32(0, 0, 255, 255) };
+    WT_Color_Map cmap(2, palette, file);
+    WT_Byte indices[4] = { 0, 1, 1, 0 };
+    WT_Image image(2, 2, WT_Image::Mapped, 1, &cmap, 4, indices,
+                   WT_Logical_Point(650, 50), WT_Logical_Point(950, 350), WD_True);
+    if (image.serialize(file) != WT_Result::Success) { file.close(); return false; }
+
     return file.close() == WT_Result::Success;
 }
 }
@@ -91,6 +100,17 @@ int main()
         expect(dark > 100, std::string("rendered geometry produces black pixels (got ") + std::to_string(dark) + ")");
         const Rgba corner = px.front();
         expect(corner.r > 200 && corner.g > 200 && corner.b > 200, "top-left corner stays background white");
+
+        // The mapped image (red/blue palette) should put saturated red or blue
+        // somewhere on the canvas (proves mapped-image decode, not a gray placeholder).
+        int colored = 0;
+        for (const auto& p : px)
+        {
+            const bool red = p.r > 180 && p.g < 80 && p.b < 80;
+            const bool blue = p.b > 180 && p.r < 80 && p.g < 80;
+            if (red || blue) ++colored;
+        }
+        expect(colored > 0, std::string("mapped image decodes to palette colors (got ") + std::to_string(colored) + ")");
     }
     else
     {
