@@ -1,0 +1,75 @@
+// Integration test (ODA build only): writes a real W2D stream with the WHIP
+// Toolkit, renders it through our C ABI, and checks a non-trivial PNG comes out.
+// This exercises the actual WT_File parsing + W2dWhipRenderer path end to end.
+#include "whiptk/whip_toolkit.h"
+#include "zs_dwf_toolkit_native.h"
+
+#include <cstdio>
+#include <filesystem>
+#include <string>
+#include <vector>
+
+namespace
+{
+int g_failures = 0;
+void expect(bool ok, const std::string& msg)
+{
+    if (!ok) { std::printf("FAIL: %s\n", msg.c_str()); ++g_failures; }
+}
+
+bool write_sample_w2d(const std::string& path)
+{
+    WT_File file;
+    file.set_filename(path.c_str());
+    file.set_file_mode(WT_File::File_Write);
+    if (file.open() != WT_Result::Success)
+        return false;
+
+    // Draw in black; the default WHIP color is white and would be invisible on
+    // the white canvas background.
+    WT_Color black(0, 0, 0);
+    if (black.serialize(file) != WT_Result::Success) { file.close(); return false; }
+
+    // A diagonal polyline plus a triangle, in a 0..1000 logical space.
+    WT_Logical_Point line[2] = { WT_Logical_Point(0, 0), WT_Logical_Point(1000, 1000) };
+    WT_Polyline polyline(2, line, WD_True);
+    if (polyline.serialize(file) != WT_Result::Success) { file.close(); return false; }
+
+    WT_Logical_Point tri[3] = { WT_Logical_Point(200, 100), WT_Logical_Point(800, 100), WT_Logical_Point(500, 700) };
+    WT_Polygon polygon(3, tri, WD_True);
+    if (polygon.serialize(file) != WT_Result::Success) { file.close(); return false; }
+
+    return file.close() == WT_Result::Success;
+}
+}
+
+int main()
+{
+    namespace fs = std::filesystem;
+    const std::string w2d = (fs::temp_directory_path() / "zs_roundtrip.w2d").string();
+    const std::string png = (fs::temp_directory_path() / "zs_roundtrip.png").string();
+    std::error_code ec;
+    fs::remove(w2d, ec);
+    fs::remove(png, ec);
+
+    if (!write_sample_w2d(w2d))
+    {
+        std::printf("FAIL: could not write sample W2D\n");
+        return 1;
+    }
+    expect(fs::exists(w2d) && fs::file_size(w2d) > 0, "sample W2D written");
+
+    std::vector<char> json(1 << 16, 0);
+    const int rc = zs_w2d_render_file(w2d.c_str(), png.c_str(), 200, 200, 96, json.data(), static_cast<int>(json.size()));
+    expect(rc == 0, std::string("zs_w2d_render_file returned 0 (got ") + std::to_string(rc) + ", err: " + zs_dwf_get_last_error() + ")");
+    expect(fs::exists(png) && fs::file_size(png) > 100, "rendered PNG is non-trivial");
+
+    const std::string j(json.data());
+    expect(j.find("\"success\":true") != std::string::npos, "render JSON reports success");
+    expect(j.find("\"polyline\":1") != std::string::npos, "render JSON counts the polyline");
+    expect(j.find("\"transform\"") != std::string::npos, "render JSON includes a transform");
+
+    if (g_failures == 0) { std::printf("W2D round-trip test passed.\n"); return 0; }
+    std::printf("%d W2D round-trip assertion(s) failed.\n", g_failures);
+    return 1;
+}

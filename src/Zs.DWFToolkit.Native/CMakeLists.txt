@@ -102,4 +102,29 @@ if(ZS_DWF_BUILD_TESTS)
     )
     target_include_directories(raster_canvas_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     add_test(NAME raster_canvas_tests COMMAND raster_canvas_tests)
+
+    # End-to-end W2D round-trip needs the WHIP Toolkit (to write a W2D) and our
+    # shared library (to render it), so it is only built when ODA is enabled.
+    if(ZS_DWF_ENABLE_ODA_DWFTK)
+        add_executable(w2d_roundtrip_tests tests/w2d_roundtrip_tests.cpp)
+        target_include_directories(w2d_roundtrip_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/compat/oda
+            ${CMAKE_CURRENT_SOURCE_DIR}/compat/oda/Include
+            ${ZS_DWF_ODA_DWFTK_ROOT}/develop/global/src
+            ${ZS_DWF_ODA_DWFTK_ROOT}/develop/global/src/dwf
+        )
+        target_link_libraries(w2d_roundtrip_tests PRIVATE zs_dwf_toolkit_native)
+        if(TARGET WhipTk)
+            target_link_libraries(w2d_roundtrip_tests PRIVATE WhipTk)
+        endif()
+        if(TARGET DwfCore)
+            target_link_libraries(w2d_roundtrip_tests PRIVATE DwfCore)
+        endif()
+        if(TARGET W3dTk)
+            target_link_libraries(w2d_roundtrip_tests PRIVATE W3dTk)
+        endif()
+        target_link_libraries(w2d_roundtrip_tests PRIVATE ZLIB::ZLIB JPEG::JPEG)
+        add_test(NAME w2d_roundtrip_tests COMMAND w2d_roundtrip_tests)
+    endif()
 endif()
