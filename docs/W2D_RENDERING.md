@@ -75,7 +75,7 @@ The first renderer supports:
 | `WT_Polygon` | Filled and outlined |
 | `WT_Outline_Ellipse` | Drawn as ellipse outline |
 | `WT_Filled_Ellipse` | Filled ellipse |
-| `WT_Text` | Draws a text placeholder box; real glyph rendering is not implemented yet |
+| `WT_Text` | Real glyphs via FreeType when built with `ZS_DWF_WITH_FREETYPE` and a system font is found; otherwise a placeholder box |
 | `WT_Image` | Uncompressed RGB/RGBA blitted into the page rect; mapped/Group4/JPEG draw a gray placeholder |
 | `WT_Viewport` | Clips subsequent drawing to the axis-aligned bounding box of the boundary contour |
 | `WT_Line_Pattern` | Non-solid polyline strokes rendered as approximate dash/dot cadences |
@@ -86,7 +86,7 @@ The PNG writer is implemented internally and writes RGBA PNG with uncompressed D
 
 The renderer is still a minimal W2D renderer. It does **not** yet fully support:
 
-- real font/glyph rendering;
+- exact font matching/metrics (FreeType renders ASCII glyphs from a system font; the original CAD font, kerning, rotation and non-ASCII are not matched);
 - compressed/mapped images (`WT_PNG_Group4_Image`, JPEG, color-mapped) — only raw RGB/RGBA images are blitted, others draw a gray placeholder;
 - non-rectangular clipping (viewport clips are approximated by their bounding box);
 - exact line-pattern tables (dash/dot are approximated), fill patterns, hatch patterns, pen patterns;

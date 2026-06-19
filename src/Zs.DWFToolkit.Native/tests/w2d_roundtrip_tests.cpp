@@ -43,6 +43,9 @@ bool write_sample_w2d(const std::string& path)
     WT_Polygon polygon(3, tri, WD_True);
     if (polygon.serialize(file) != WT_Result::Success) { file.close(); return false; }
 
+    WT_Text text(WT_Logical_Point(120, 500), WT_String("ABC"));
+    if (text.serialize(file) != WT_Result::Success) { file.close(); return false; }
+
     return file.close() == WT_Result::Success;
 }
 }

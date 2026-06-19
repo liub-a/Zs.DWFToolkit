@@ -7,12 +7,14 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(ZS_DWF_ENABLE_ODA_DWFTK "Build and link the bundled ODA-modified DWFToolkit-7.7 source" OFF)
 option(ZS_DWF_BUILD_TESTS "Build native RasterCanvas unit tests (CTest)" OFF)
+option(ZS_DWF_WITH_FREETYPE "Render W2D text with FreeType glyphs instead of placeholder boxes" OFF)
 set(ZS_DWF_ODA_DWFTK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/DWFToolkit-7.7" CACHE PATH "Path to ODA-modified DWFToolkit-7.7 root")
 
 add_library(zs_dwf_toolkit_native SHARED
     src/zs_dwf_toolkit_native.cpp
     src/render/MinimalPng.cpp
     src/render/RasterCanvas.cpp
+    src/text/TextRenderer.cpp
     src/w2d/W2dWhipRenderer.cpp
     src/dwf/OdaDwfAdapter.cpp
 )
@@ -26,6 +28,15 @@ target_include_directories(zs_dwf_toolkit_native PRIVATE
 )
 
 target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_TOOLKIT_NATIVE_EXPORTS)
+
+if(ZS_DWF_WITH_FREETYPE)
+    if(APPLE)
+        list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/freetype /usr/local/opt/freetype)
+    endif()
+    find_package(Freetype REQUIRED)
+    target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_WITH_FREETYPE=1)
+    target_link_libraries(zs_dwf_toolkit_native PRIVATE Freetype::Freetype)
+endif()
 
 if(ZS_DWF_ENABLE_ODA_DWFTK)
     if(NOT EXISTS "${ZS_DWF_ODA_DWFTK_ROOT}/CMakeLists.txt")

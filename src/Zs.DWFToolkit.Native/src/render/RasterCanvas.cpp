@@ -338,6 +338,33 @@ void RasterCanvas::draw_image(const BoxD& logical_rect,
     }
 }
 
+void RasterCanvas::blend_coverage(int dst_x, int dst_y, const std::uint8_t* coverage,
+                                  int w, int h, int pitch, Rgba color)
+{
+    if (!coverage || w <= 0 || h <= 0)
+        return;
+    for (int gy = 0; gy < h; ++gy)
+    {
+        const std::uint8_t* row = coverage + static_cast<std::size_t>(gy) * static_cast<std::size_t>(pitch);
+        const int y = dst_y + gy;
+        if (y < 0 || y >= _height) continue;
+        for (int gx = 0; gx < w; ++gx)
+        {
+            const int x = dst_x + gx;
+            if (x < 0 || x >= _width) continue;
+            const int a = row[gx];
+            if (a == 0) continue;
+            if (_has_clip && (x < _clip_x0 || y < _clip_y0 || x > _clip_x1 || y > _clip_y1)) continue;
+            auto& px = _pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(_width) + static_cast<std::size_t>(x)];
+            const int ia = 255 - a;
+            px.r = static_cast<std::uint8_t>((color.r * a + px.r * ia) / 255);
+            px.g = static_cast<std::uint8_t>((color.g * a + px.g * ia) / 255);
+            px.b = static_cast<std::uint8_t>((color.b * a + px.b * ia) / 255);
+            px.a = 255;
+        }
+    }
+}
+
 void RasterCanvas::draw_text_marker(PointD position, int glyph_count, Rgba color, int thickness)
 {
     const int len = std::max(1, glyph_count);

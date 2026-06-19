@@ -71,6 +71,12 @@ public:
     void fill_ellipse(PointD center, double radius_x, double radius_y, double tilt_rad, Rgba color);
     void draw_text_marker(PointD position, int glyph_count, Rgba color, int thickness);
 
+    // Alpha-composites an 8-bit coverage bitmap (e.g. a FreeType glyph) at pixel
+    // (dst_x, dst_y) top-left, using `color` modulated by per-pixel coverage.
+    // `pitch` is the bytes-per-row stride of the coverage buffer.
+    void blend_coverage(int dst_x, int dst_y, const std::uint8_t* coverage,
+                        int w, int h, int pitch, Rgba color);
+
     // Blit a row-major RGBA image (src_w x src_h) into the logical rectangle
     // [min..max] using nearest-neighbour sampling. The rectangle is mapped through
     // the same logical->pixel transform as vector primitives so images line up

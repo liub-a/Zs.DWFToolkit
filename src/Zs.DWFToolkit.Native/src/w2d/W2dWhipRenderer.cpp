@@ -11,6 +11,7 @@
 
 #ifdef ZS_DWF_WITH_ODA_DWFTK
 #include "whiptk/whip_toolkit.h"
+#include "../text/TextRenderer.h"
 #endif
 
 namespace zs::dwf::w2d
@@ -51,6 +52,7 @@ namespace
         int text_count{0};
         int image_count{0};
         int unsupported_count{0};
+        zs::dwf::text::TextRenderer* text{nullptr};
     };
 
     W2dContext* ctx(WT_File& file)
@@ -232,7 +234,23 @@ namespace
         }
         else if (c->canvas && is_visible(file))
         {
-            c->canvas->draw_text_marker(p, glyphs, current_color(file), current_thickness(file, c->canvas));
+            const Rgba color = current_color(file);
+            const auto pen = c->canvas->to_pixel(p);
+            // Font height is in drawing units; map to pixels via the canvas scale.
+            const int font_units = file.rendition().font().height().height();
+            int px_height = static_cast<int>(std::llround(font_units * c->canvas->scale()));
+            if (px_height < 6) px_height = 12;
+
+            bool drawn = false;
+            if (c->text && c->text->ready() && item.string().ascii())
+            {
+                drawn = c->text->draw(*c->canvas, item.string().ascii(),
+                                      static_cast<int>(std::llround(pen.x)),
+                                      static_cast<int>(std::llround(pen.y)),
+                                      px_height, color);
+            }
+            if (!drawn)
+                c->canvas->draw_text_marker(p, glyphs, color, current_thickness(file, c->canvas));
         }
         return WT_Result::Success;
     }
@@ -459,10 +477,12 @@ RenderResult render_w2d_file_to_png(
     collector.bounds.max_y += dy;
 
     RasterCanvas canvas(width_px, height_px, collector.bounds);
+    zs::dwf::text::TextRenderer text_renderer;
     W2dContext painter;
     painter.collecting = false;
     painter.bounds = collector.bounds;
     painter.canvas = &canvas;
+    painter.text = &text_renderer;
     result = process_w2d(w2d_path, painter);
     if (result != WT_Result::Success)
     {

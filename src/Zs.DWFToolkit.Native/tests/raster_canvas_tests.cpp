@@ -131,6 +131,18 @@ int main()
         expect(white > 0, "hatch leaves gaps between lines (not a solid fill)");
     }
 
+    // blend_coverage alpha-composites a glyph-style coverage bitmap.
+    {
+        RasterCanvas c(100, 100, unit_box());
+        // 2x2 coverage: full, half, zero, full.
+        std::uint8_t cov[4] = { 255, 128, 0, 255 };
+        c.blend_coverage(50, 50, cov, 2, 2, 2, Rgba{0, 0, 0, 255});
+        expect(is_color(pixel_at(c, 50, 50), 0, 0, 0), "blend_coverage full coverage paints solid");
+        const auto& half = pixel_at(c, 51, 50);
+        expect(half.r > 100 && half.r < 200, "blend_coverage half coverage blends toward background");
+        expect(is_color(pixel_at(c, 50, 51), 255, 255, 255), "blend_coverage zero coverage leaves background");
+    }
+
     if (g_failures == 0)
     {
         std::printf("All RasterCanvas tests passed.\n");
