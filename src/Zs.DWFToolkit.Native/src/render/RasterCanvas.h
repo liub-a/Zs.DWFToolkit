@@ -64,6 +64,15 @@ public:
     void fill_ellipse(PointD center, double radius_x, double radius_y, double tilt_rad, Rgba color);
     void draw_text_marker(PointD position, int glyph_count, Rgba color, int thickness);
 
+    // Blit a row-major RGBA image (src_w x src_h) into the logical rectangle
+    // [min..max] using nearest-neighbour sampling. The rectangle is mapped through
+    // the same logical->pixel transform as vector primitives so images line up
+    // with the drawing.
+    void draw_image(const BoxD& logical_rect,
+                    int src_w,
+                    int src_h,
+                    const std::vector<Rgba>& src_pixels);
+
 private:
     void set_pixel(int x, int y, Rgba color);
     void draw_disc(int cx, int cy, int radius, Rgba color);

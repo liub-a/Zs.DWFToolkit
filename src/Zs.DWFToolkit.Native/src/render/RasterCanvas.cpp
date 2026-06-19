@@ -192,6 +192,43 @@ void RasterCanvas::fill_ellipse(PointD center, double radius_x, double radius_y,
     fill_polygon(pts, color);
 }
 
+void RasterCanvas::draw_image(const BoxD& logical_rect,
+                             int src_w,
+                             int src_h,
+                             const std::vector<Rgba>& src_pixels)
+{
+    if (src_w <= 0 || src_h <= 0 ||
+        src_pixels.size() < static_cast<std::size_t>(src_w) * static_cast<std::size_t>(src_h) ||
+        !logical_rect.valid())
+        return;
+
+    const auto top_left = to_pixel({ logical_rect.min_x, logical_rect.max_y });
+    const auto bottom_right = to_pixel({ logical_rect.max_x, logical_rect.min_y });
+
+    const int px0 = clamp_int(static_cast<int>(std::floor(std::min(top_left.x, bottom_right.x))), 0, _width - 1);
+    const int px1 = clamp_int(static_cast<int>(std::ceil(std::max(top_left.x, bottom_right.x))), 0, _width - 1);
+    const int py0 = clamp_int(static_cast<int>(std::floor(std::min(top_left.y, bottom_right.y))), 0, _height - 1);
+    const int py1 = clamp_int(static_cast<int>(std::ceil(std::max(top_left.y, bottom_right.y))), 0, _height - 1);
+
+    const double dst_w = std::max(1, px1 - px0);
+    const double dst_h = std::max(1, py1 - py0);
+
+    for (int y = py0; y <= py1; ++y)
+    {
+        const double v = (dst_h <= 0) ? 0.0 : static_cast<double>(y - py0) / dst_h;
+        const int sy = clamp_int(static_cast<int>(v * src_h), 0, src_h - 1);
+        for (int x = px0; x <= px1; ++x)
+        {
+            const double u = (dst_w <= 0) ? 0.0 : static_cast<double>(x - px0) / dst_w;
+            const int sx = clamp_int(static_cast<int>(u * src_w), 0, src_w - 1);
+            const Rgba& c = src_pixels[static_cast<std::size_t>(sy) * static_cast<std::size_t>(src_w) + static_cast<std::size_t>(sx)];
+            if (c.a == 0)
+                continue;
+            set_pixel(x, y, c);
+        }
+    }
+}
+
 void RasterCanvas::draw_text_marker(PointD position, int glyph_count, Rgba color, int thickness)
 {
     const int len = std::max(1, glyph_count);

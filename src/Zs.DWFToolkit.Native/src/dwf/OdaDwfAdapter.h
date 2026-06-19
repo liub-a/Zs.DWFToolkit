@@ -13,4 +13,17 @@ zs::dwf::w2d::RenderResult render_dwf_or_w2d_page_to_png(
     int height_px,
     int dpi);
 
+// Reads package-level info (sections -> pages) from a DWF/DWFx file and returns a
+// JSON document matching the DwfDocumentInfo contract in docs/NATIVE_INTEGRATION.md.
+// Only meaningful when built with ZS_DWF_WITH_ODA_DWFTK; returns an
+// unsupported_dwf_rendering JSON otherwise.
+struct InfoResult
+{
+    bool success{false};
+    int result_code{0};
+    std::string json;
+};
+
+InfoResult get_dwf_info_json(const std::string& input_path);
+
 } // namespace zs::dwf::oda

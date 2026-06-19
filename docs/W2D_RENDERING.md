@@ -76,6 +76,7 @@ The first renderer supports:
 | `WT_Outline_Ellipse` | Drawn as ellipse outline |
 | `WT_Filled_Ellipse` | Filled ellipse |
 | `WT_Text` | Draws a text placeholder box; real glyph rendering is not implemented yet |
+| `WT_Image` | Uncompressed RGB/RGBA blitted into the page rect; mapped/Group4/JPEG draw a gray placeholder |
 
 The PNG writer is implemented internally and writes RGBA PNG with uncompressed DEFLATE blocks. This keeps the native renderer independent from libpng/zlib packaging concerns.
 
@@ -84,7 +85,7 @@ The PNG writer is implemented internally and writes RGBA PNG with uncompressed D
 The renderer is still a minimal W2D renderer. It does **not** yet fully support:
 
 - real font/glyph rendering;
-- embedded images and `WT_PNG_Group4_Image`;
+- compressed/mapped images (`WT_PNG_Group4_Image`, JPEG, color-mapped) — only raw RGB/RGBA images are blitted, others draw a gray placeholder;
 - complex clipping and viewport state;
 - line patterns, fill patterns, hatch patterns, pen patterns;
 - layer visibility controls;
@@ -108,7 +109,7 @@ In the current development environment:
 
 Recommended order:
 
-1. Add support for `WT_Image` and `WT_PNG_Group4_Image`.
+1. Decode compressed/mapped images (`WT_PNG_Group4_Image`, JPEG, color-mapped); raw RGB/RGBA is already blitted.
 2. Add proper text rendering using FreeType, Skia, Cairo, or another font backend.
 3. Add clipping/viewport state and transform stack support.
 4. Add line styles, fill styles and hatch patterns.

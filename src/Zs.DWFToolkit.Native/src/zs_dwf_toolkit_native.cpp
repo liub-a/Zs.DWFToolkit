@@ -61,26 +61,19 @@ extern "C" ZS_DWF_API int zs_dwf_get_info_json(
         g_last_error = "file not found or not readable";
         return ZS_DWF_FILE_NOT_FOUND;
     }
+    f.close();
 
-    // This stub proves the ABI and loading path.
-    // Replace this block with DWF Toolkit parsing when DWFToolkit-7.7 is added.
-    const std::string json = std::string("{") +
-        "\"success\":false," +
-        "\"errorCode\":\"unsupported_dwf_rendering\"," +
-        "\"errorMessage\":\"Native stub is loaded, but DWF Toolkit parsing is not implemented yet. Add DWFToolkit-7.7 and implement DwfNativeAdapter.\"," +
-        "\"sourcePath\":\"" + json_escape(input_path) + "\"," +
-        "\"kind\":1," +
-        "\"isZipBased\":false," +
-        "\"pages\":[]," +
-        "\"entries\":[]," +
-        "\"properties\":{}" +
-        "}";
+    // When built with ZS_DWF_ENABLE_ODA_DWFTK the adapter parses the DWF package
+    // and returns real section/page info. Otherwise it returns an
+    // unsupported_dwf_rendering JSON so the managed layer can fall back to its own
+    // ZIP/OPC reader.
+    auto info = zs::dwf::oda::get_dwf_info_json(input_path);
 
-    if (!copy_json(json, output_json, output_json_size))
+    if (!copy_json(info.json, output_json, output_json_size))
         return ZS_DWF_OUTPUT_FAILED;
 
-    g_last_error.clear();
-    return ZS_DWF_OK;
+    g_last_error = info.success ? std::string() : std::string("native get_info returned a non-success result");
+    return info.success ? ZS_DWF_OK : info.result_code;
 }
 
 extern "C" ZS_DWF_API int zs_dwf_render_page(

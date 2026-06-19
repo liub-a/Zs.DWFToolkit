@@ -28,6 +28,25 @@ using zs::dwf::w2d::render_w2d_file_to_png;
 
 namespace
 {
+    std::string json_escape_str(const std::string& value)
+    {
+        std::string out;
+        out.reserve(value.size() + 8);
+        for (char ch : value)
+        {
+            switch (ch)
+            {
+                case '\\': out += "\\\\"; break;
+                case '"': out += "\\\""; break;
+                case '\n': out += "\\n"; break;
+                case '\r': out += "\\r"; break;
+                case '\t': out += "\\t"; break;
+                default: out += ch; break;
+            }
+        }
+        return out;
+    }
+
 #ifdef ZS_DWF_WITH_ODA_DWFTK
     std::string narrow(const wchar_t* value)
     {
@@ -225,6 +244,112 @@ RenderResult render_dwf_or_w2d_page_to_png(
     catch (...)
     {
         return RenderResult{false, 1999, "native_exception", "Unknown native exception", ""};
+    }
+#endif
+}
+
+InfoResult get_dwf_info_json(const std::string& input_path)
+{
+#ifndef ZS_DWF_WITH_ODA_DWFTK
+    (void)input_path;
+    InfoResult r;
+    r.success = false;
+    r.result_code = 1007;
+    r.json = std::string("{") +
+        "\"success\":false," +
+        "\"errorCode\":\"unsupported_dwf_rendering\"," +
+        "\"errorMessage\":\"Native get_info requires building with ZS_DWF_ENABLE_ODA_DWFTK=ON.\"," +
+        "\"sourcePath\":\"" + json_escape_str(input_path) + "\"," +
+        "\"kind\":1,\"isZipBased\":false,\"pages\":[],\"entries\":[],\"properties\":{}" +
+        "}";
+    return r;
+#else
+    try
+    {
+        DWFCore::DWFFile file(input_path.c_str());
+        DWFToolkit::DWFPackageReader reader(file);
+        DWFToolkit::DWFPackageReader::tPackageInfo info;
+        reader.getPackageInfo(info);
+
+        const bool is_package =
+            info.eType == DWFToolkit::DWFPackageReader::eDWFPackage ||
+            info.eType == DWFToolkit::DWFPackageReader::eDWFXPackage;
+
+        std::ostringstream pages;
+        int page_count = 0;
+
+        if (is_package)
+        {
+            DWFToolkit::DWFManifest& manifest = reader.getManifest();
+            DWFToolkit::DWFManifest::SectionIterator* sections = manifest.getSections();
+            if (sections)
+            {
+                for (; sections->valid(); sections->next())
+                {
+                    DWFToolkit::DWFSection* section = sections->get();
+                    if (!section)
+                        continue;
+
+                    const std::string title = to_utf8(section->title());
+                    DWFToolkit::DWFResource* w2d = first_w2d_resource(*section);
+                    const std::string href = w2d ? to_utf8(w2d->href()) : std::string();
+
+                    if (page_count > 0)
+                        pages << ",";
+                    pages << "{"
+                          << "\"pageIndex\":" << page_count << ","
+                          << "\"pageName\":\"" << json_escape_str(title) << "\","
+                          << "\"graphicsResourcePath\":\"" << json_escape_str(href) << "\","
+                          << "\"has2dGraphics\":" << (w2d ? "true" : "false") << ","
+                          << "\"unit\":\"dwf_internal\""
+                          << "}";
+                    ++page_count;
+                }
+                DWFCORE_FREE_OBJECT(sections);
+            }
+        }
+
+        InfoResult r;
+        r.success = is_package;
+        r.result_code = is_package ? 0 : 1004;
+        std::ostringstream json;
+        json << "{"
+             << "\"success\":" << (is_package ? "true" : "false") << ","
+             << "\"errorCode\":\"" << (is_package ? "ok" : "unsupported_format") << "\","
+             << "\"errorMessage\":" << (is_package ? "null" : "\"Input is not a DWF/DWFx package\"") << ","
+             << "\"sourcePath\":\"" << json_escape_str(input_path) << "\","
+             << "\"kind\":1,"
+             << "\"isZipBased\":true,"
+             << "\"pages\":[" << pages.str() << "],"
+             << "\"entries\":[],"
+             << "\"properties\":{}"
+             << "}";
+        r.json = json.str();
+        return r;
+    }
+    catch (const DWFCore::DWFException& ex)
+    {
+        InfoResult r;
+        r.success = false;
+        r.result_code = 1007;
+        r.json = std::string("{") +
+            "\"success\":false,\"errorCode\":\"dwf_toolkit_exception\"," +
+            "\"errorMessage\":\"" + json_escape_str(narrow(ex.type()) + ": " + narrow(ex.message())) + "\"," +
+            "\"sourcePath\":\"" + json_escape_str(input_path) + "\"," +
+            "\"kind\":1,\"isZipBased\":true,\"pages\":[],\"entries\":[],\"properties\":{}}";
+        return r;
+    }
+    catch (const std::exception& ex)
+    {
+        InfoResult r;
+        r.success = false;
+        r.result_code = 1999;
+        r.json = std::string("{") +
+            "\"success\":false,\"errorCode\":\"native_exception\"," +
+            "\"errorMessage\":\"" + json_escape_str(ex.what()) + "\"," +
+            "\"sourcePath\":\"" + json_escape_str(input_path) + "\"," +
+            "\"kind\":1,\"isZipBased\":true,\"pages\":[],\"entries\":[],\"properties\":{}}";
+        return r;
     }
 #endif
 }

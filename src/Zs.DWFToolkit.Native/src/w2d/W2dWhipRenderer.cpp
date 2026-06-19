@@ -49,6 +49,7 @@ namespace
         int outline_ellipse_count{0};
         int filled_ellipse_count{0};
         int text_count{0};
+        int image_count{0};
         int unsupported_count{0};
     };
 
@@ -194,6 +195,76 @@ namespace
         return WT_Result::Success;
     }
 
+    // Reads the four bytes of a WT_Image pixel as RGBA, tolerating the common
+    // WHIP image formats. Returns false for formats whose raw bytes we cannot map
+    // directly (compressed/mapped); the caller then falls back to a placeholder.
+    bool image_to_rgba(const WT_Image& img, std::vector<Rgba>& out, int& w, int& h)
+    {
+        w = img.columns();
+        h = img.rows();
+        if (w <= 0 || h <= 0 || img.data() == nullptr)
+            return false;
+
+        const WT_Byte* data = img.data();
+        const WT_Image::WT_Image_Format fmt = img.format();
+        out.resize(static_cast<std::size_t>(w) * static_cast<std::size_t>(h));
+
+        if (fmt == WT_Image::RGBA)
+        {
+            for (std::size_t i = 0; i < out.size(); ++i)
+            {
+                const WT_Byte* p = data + i * 4;
+                out[i] = { p[0], p[1], p[2], p[3] };
+            }
+            return true;
+        }
+        if (fmt == WT_Image::RGB)
+        {
+            for (std::size_t i = 0; i < out.size(); ++i)
+            {
+                const WT_Byte* p = data + i * 3;
+                out[i] = { p[0], p[1], p[2], 255 };
+            }
+            return true;
+        }
+        // Mapped/Group3X/Group4/JPEG etc. need a decoder we do not yet ship.
+        return false;
+    }
+
+    WT_Result on_image(WT_Image& item, WT_File& file)
+    {
+        W2dContext* c = ctx(file);
+        if (!c) return WT_Result::Internal_Error;
+        c->image_count++;
+
+        BoxD rect;
+        rect.include(static_cast<double>(item.min_corner().m_x), static_cast<double>(item.min_corner().m_y));
+        rect.include(static_cast<double>(item.max_corner().m_x), static_cast<double>(item.max_corner().m_y));
+
+        if (c->collecting)
+        {
+            c->bounds.include(rect);
+            return WT_Result::Success;
+        }
+        if (!c->canvas)
+            return WT_Result::Success;
+
+        std::vector<Rgba> pixels;
+        int iw = 0, ih = 0;
+        if (image_to_rgba(item, pixels, iw, ih))
+        {
+            c->canvas->draw_image(rect, iw, ih, pixels);
+        }
+        else
+        {
+            // Placeholder for formats we cannot decode yet (mapped/Group4/JPEG).
+            c->unsupported_count++;
+            std::vector<Rgba> gray(1, Rgba{ 220, 220, 220, 255 });
+            c->canvas->draw_image(rect, 1, 1, gray);
+        }
+        return WT_Result::Success;
+    }
+
     WT_Result on_view(WT_View& item, WT_File& file)
     {
         W2dContext* c = ctx(file);
@@ -217,6 +288,7 @@ namespace
         file.set_outline_ellipse_action(on_outline_ellipse);
         file.set_filled_ellipse_action(on_filled_ellipse);
         file.set_text_action(on_text);
+        file.set_image_action(on_image);
         file.set_view_action(on_view);
 
         WT_Result result = file.open();
@@ -348,7 +420,8 @@ RenderResult render_w2d_file_to_png(
          << "\"polygon\":" << painter.polygon_count << ","
          << "\"outlineEllipse\":" << painter.outline_ellipse_count << ","
          << "\"filledEllipse\":" << painter.filled_ellipse_count << ","
-         << "\"text\":" << painter.text_count << "},"
+         << "\"text\":" << painter.text_count << ","
+         << "\"image\":" << painter.image_count << "},"
          << "\"transform\":{"
          << "\"pageWidth\":" << (collector.bounds.max_x - collector.bounds.min_x) << ","
          << "\"pageHeight\":" << (collector.bounds.max_y - collector.bounds.min_y) << ","
