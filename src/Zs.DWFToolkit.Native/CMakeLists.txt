@@ -30,12 +30,40 @@ target_include_directories(zs_dwf_toolkit_native PRIVATE
 target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_TOOLKIT_NATIVE_EXPORTS)
 
 if(ZS_DWF_WITH_FREETYPE)
-    if(APPLE)
-        list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/freetype /usr/local/opt/freetype)
-    endif()
-    find_package(Freetype REQUIRED)
+    # Self-contained text rendering: vendor FreeType (no external deps) and embed a
+    # font, so neither a system FreeType nor a system font file is required at runtime.
+    include(FetchContent)
+    set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        freetype
+        GIT_REPOSITORY https://github.com/freetype/freetype.git
+        GIT_TAG VER-2-13-3
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(freetype)
+
+    # Compile the bundled font into the library as a byte array (build-time generated).
+    set(ZS_DWF_FONT_TTF "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/fonts/DejaVuSans.ttf")
+    set(ZS_DWF_FONT_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/embedded_font.h")
+    file(READ "${ZS_DWF_FONT_TTF}" ZS_DWF_FONT_HEX HEX)
+    string(LENGTH "${ZS_DWF_FONT_HEX}" ZS_DWF_FONT_HEXLEN)
+    math(EXPR ZS_DWF_FONT_LEN "${ZS_DWF_FONT_HEXLEN} / 2")
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," ZS_DWF_FONT_BYTES "${ZS_DWF_FONT_HEX}")
+    file(WRITE "${ZS_DWF_FONT_HEADER}"
+        "// Generated at configure time from third_party/fonts/DejaVuSans.ttf. Do not edit.\n"
+        "#pragma once\n"
+        "namespace zs { namespace dwf { namespace text {\n"
+        "static const unsigned char kEmbeddedFont[] = {${ZS_DWF_FONT_BYTES}};\n"
+        "static const unsigned long kEmbeddedFontSize = ${ZS_DWF_FONT_LEN}UL;\n"
+        "}}}\n")
+
     target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_WITH_FREETYPE=1)
-    target_link_libraries(zs_dwf_toolkit_native PRIVATE Freetype::Freetype)
+    target_include_directories(zs_dwf_toolkit_native PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+    target_link_libraries(zs_dwf_toolkit_native PRIVATE freetype)
 endif()
 
 if(ZS_DWF_ENABLE_ODA_DWFTK)

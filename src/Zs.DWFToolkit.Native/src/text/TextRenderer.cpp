@@ -1,11 +1,11 @@
 #include "TextRenderer.h"
 
-#include <cstdio>
 #include <cstdlib>
 
 #ifdef ZS_DWF_WITH_FREETYPE
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include "embedded_font.h"
 #endif
 
 namespace zs::dwf::text
@@ -13,47 +13,25 @@ namespace zs::dwf::text
 using zs::dwf::native_render::RasterCanvas;
 using zs::dwf::native_render::Rgba;
 
-#ifdef ZS_DWF_WITH_FREETYPE
-namespace
-{
-    // Tries an env override first, then common system font paths across platforms.
-    const char* candidate_font_path()
-    {
-        if (const char* env = std::getenv("ZS_DWF_FONT"))
-            return env;
-        static const char* const candidates[] = {
-            "/System/Library/Fonts/Supplemental/Arial.ttf",
-            "/System/Library/Fonts/Helvetica.ttc",
-            "/Library/Fonts/Arial.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-            "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/TTF/DejaVuSans.ttf",
-            "C:\\Windows\\Fonts\\arial.ttf",
-        };
-        for (const char* p : candidates)
-        {
-            if (FILE* f = std::fopen(p, "rb")) { std::fclose(f); return p; }
-        }
-        return nullptr;
-    }
-}
-#endif
-
 TextRenderer::TextRenderer()
 {
 #ifdef ZS_DWF_WITH_FREETYPE
-    const char* font = candidate_font_path();
-    if (!font)
-        return;
     FT_Library lib;
     if (FT_Init_FreeType(&lib) != 0)
         return;
-    FT_Face face;
-    if (FT_New_Face(lib, font, 0, &face) != 0)
+
+    FT_Face face = nullptr;
+    // Optional override: ZS_DWF_FONT points at an external TTF. Default uses the
+    // font compiled into the library, so no system font is required.
+    if (const char* env = std::getenv("ZS_DWF_FONT"))
+        FT_New_Face(lib, env, 0, &face);
+    if (!face)
     {
-        FT_Done_FreeType(lib);
-        return;
+        if (FT_New_Memory_Face(lib, kEmbeddedFont, static_cast<FT_Long>(kEmbeddedFontSize), 0, &face) != 0)
+        {
+            FT_Done_FreeType(lib);
+            return;
+        }
     }
     _library = lib;
     _face = face;
