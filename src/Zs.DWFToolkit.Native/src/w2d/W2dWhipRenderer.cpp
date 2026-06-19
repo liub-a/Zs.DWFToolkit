@@ -60,6 +60,7 @@ namespace
         int polytriangle_count{0};
         int contour_set_count{0};
         int polymarker_count{0};
+        int macro_draw_count{0};
         int unsupported_count{0};
         zs::dwf::text::TextRenderer* text{nullptr};
     };
@@ -173,6 +174,30 @@ namespace
                 c->canvas->fill_polygon(pts, color);
             }
             c->canvas->draw_polyline(pts, color, current_thickness(file, c->canvas), true);
+        }
+        return WT_Result::Success;
+    }
+
+    // Macro instances: the WHIP toolkit records macro geometry in an internal
+    // object stream with no public accessor to replay it, so full expansion (a
+    // transform stack re-emitting the macro's drawables at each placement) is out
+    // of scope. As a preview aid we mark each placement point so macro instances
+    // are not silently invisible.
+    WT_Result on_macro_draw(WT_Macro_Draw& item, WT_File& file)
+    {
+        W2dContext* c = ctx(file);
+        if (!c) return WT_Result::Internal_Error;
+        c->macro_draw_count++;
+        const auto pts = points_from_set(item);
+        if (c->collecting)
+        {
+            include_points(c->bounds, pts);
+        }
+        else if (c->canvas && is_visible(file))
+        {
+            const auto color = current_color(file);
+            for (const auto& p : pts)
+                c->canvas->fill_marker(p, 2, color);
         }
         return WT_Result::Success;
     }
@@ -572,6 +597,7 @@ namespace
         file.set_polytriangle_action(on_polytriangle);
         file.set_contour_set_action(on_contour_set);
         file.set_polymarker_action(on_polymarker);
+        file.set_macro_draw_action(on_macro_draw);
         file.set_viewport_action(on_viewport);
         file.set_view_action(on_view);
 

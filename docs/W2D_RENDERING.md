@@ -78,6 +78,9 @@ The first renderer supports:
 | `WT_Text` | Real glyphs via FreeType when built with `ZS_DWF_WITH_FREETYPE` and a system font is found; otherwise a placeholder box |
 | `WT_Image` | RGB/RGBA, color-mapped/indexed, JPEG, bitonal/Group3X, and Group4X fax (vendored libtiff) all decoded to the page rect |
 | `WT_Polytriangle` | Triangle strip filled with the current color |
+| `WT_Contour_Set` | Multi-contour fill with even-odd holes |
+| `WT_Polymarker` | Small screen-constant dot at each point |
+| `WT_Macro_Draw` | Placement points marked (full macro geometry replay not implemented) |
 | `WT_Viewport` | Clips subsequent drawing to the axis-aligned bounding box of the boundary contour |
 | `WT_Line_Pattern` | Non-solid polyline strokes rendered as approximate dash/dot cadences |
 
@@ -92,7 +95,8 @@ The renderer is still a minimal W2D renderer. It does **not** yet fully support:
 - non-rectangular clipping (viewport clips are approximated by their bounding box);
 - exact line-pattern tables (dash/dot are approximated), fill patterns, hatch patterns, pen patterns;
 - layer visibility controls;
-- macro draw/definition expansion;
+- full macro geometry replay (macro placements are marked, but the recorded macro
+  drawables are not re-emitted with a transform stack);
 - exact AutoCAD plot style reproduction;
 - antialiasing;
 - 3D DWF/eModel rendering.
