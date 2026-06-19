@@ -46,6 +46,12 @@ bool write_sample_w2d(const std::string& path)
     WT_Text text(WT_Logical_Point(120, 500), WT_String("ABC"));
     if (text.serialize(file) != WT_Result::Success) { file.close(); return false; }
 
+    // A triangle strip (4 points -> 2 filled triangles), to exercise polytriangle.
+    WT_Logical_Point strip[4] = { WT_Logical_Point(60, 600), WT_Logical_Point(60, 780),
+                                  WT_Logical_Point(240, 600), WT_Logical_Point(240, 780) };
+    WT_Polytriangle polytri(4, strip, WD_True);
+    if (polytri.serialize(file) != WT_Result::Success) { file.close(); return false; }
+
     // A 2x2 color-mapped image (red/blue) in the lower-right, to exercise the
     // mapped-image decode path end to end.
     WT_RGBA32 palette[2] = { WT_RGBA32(255, 0, 0, 255), WT_RGBA32(0, 0, 255, 255) };

@@ -56,6 +56,7 @@ namespace
         int filled_ellipse_count{0};
         int text_count{0};
         int image_count{0};
+        int polytriangle_count{0};
         int unsupported_count{0};
         zs::dwf::text::TextRenderer* text{nullptr};
     };
@@ -169,6 +170,27 @@ namespace
                 c->canvas->fill_polygon(pts, color);
             }
             c->canvas->draw_polyline(pts, color, current_thickness(file, c->canvas), true);
+        }
+        return WT_Result::Success;
+    }
+
+    WT_Result on_polytriangle(WT_Polytriangle& item, WT_File& file)
+    {
+        W2dContext* c = ctx(file);
+        if (!c) return WT_Result::Internal_Error;
+        c->polytriangle_count++;
+        const auto pts = points_from_set(item);
+        if (c->collecting)
+        {
+            include_points(c->bounds, pts);
+        }
+        else if (c->canvas && is_visible(file))
+        {
+            // Points form a triangle strip: each new vertex closes a triangle with
+            // the previous two.
+            const auto color = current_color(file);
+            for (std::size_t i = 2; i < pts.size(); ++i)
+                c->canvas->fill_polygon({ pts[i - 2], pts[i - 1], pts[i] }, color);
         }
         return WT_Result::Success;
     }
@@ -477,6 +499,7 @@ namespace
         file.set_filled_ellipse_action(on_filled_ellipse);
         file.set_text_action(on_text);
         file.set_image_action(on_image);
+        file.set_polytriangle_action(on_polytriangle);
         file.set_viewport_action(on_viewport);
         file.set_view_action(on_view);
 
@@ -619,7 +642,8 @@ RenderResult render_w2d_file_to_png(
          << "\"outlineEllipse\":" << painter.outline_ellipse_count << ","
          << "\"filledEllipse\":" << painter.filled_ellipse_count << ","
          << "\"text\":" << painter.text_count << ","
-         << "\"image\":" << painter.image_count << "},"
+         << "\"image\":" << painter.image_count << ","
+         << "\"polytriangle\":" << painter.polytriangle_count << "},"
          << "\"transform\":{"
          << "\"pageWidth\":" << (collector.bounds.max_x - collector.bounds.min_x) << ","
          << "\"pageHeight\":" << (collector.bounds.max_y - collector.bounds.min_y) << ","
