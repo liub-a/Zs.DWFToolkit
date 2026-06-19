@@ -225,6 +225,56 @@ void RasterCanvas::fill_polygon(const std::vector<PointD>& pts, Rgba color)
     }
 }
 
+void RasterCanvas::fill_contours(const std::vector<std::vector<PointD>>& contours, Rgba color)
+{
+    std::vector<std::vector<PointD>> px;
+    px.reserve(contours.size());
+    double min_y = 0, max_y = 0;
+    bool first = true;
+    for (const auto& c : contours)
+    {
+        if (c.size() < 3) continue;
+        std::vector<PointD> p;
+        p.reserve(c.size());
+        for (auto v : c)
+        {
+            const auto q = to_pixel(v);
+            p.push_back(q);
+            if (first) { min_y = max_y = q.y; first = false; }
+            else { min_y = std::min(min_y, q.y); max_y = std::max(max_y, q.y); }
+        }
+        px.push_back(std::move(p));
+    }
+    if (px.empty()) return;
+
+    const int y0 = clamp_int(static_cast<int>(std::floor(min_y)), 0, _height - 1);
+    const int y1 = clamp_int(static_cast<int>(std::ceil(max_y)), 0, _height - 1);
+    std::vector<double> nodes;
+    for (int y = y0; y <= y1; ++y)
+    {
+        nodes.clear();
+        const double scan_y = static_cast<double>(y) + 0.5;
+        for (const auto& p : px)
+        {
+            for (std::size_t i = 0, j = p.size() - 1; i < p.size(); j = i++)
+            {
+                const auto& pi = p[i];
+                const auto& pj = p[j];
+                if ((pi.y < scan_y && pj.y >= scan_y) || (pj.y < scan_y && pi.y >= scan_y))
+                    nodes.push_back(pi.x + (scan_y - pi.y) / (pj.y - pi.y) * (pj.x - pi.x));
+            }
+        }
+        std::sort(nodes.begin(), nodes.end());
+        for (std::size_t k = 0; k + 1 < nodes.size(); k += 2)
+        {
+            const int xs = clamp_int(static_cast<int>(std::ceil(nodes[k])), 0, _width - 1);
+            const int xe = clamp_int(static_cast<int>(std::floor(nodes[k + 1])), 0, _width - 1);
+            for (int x = xs; x <= xe; ++x)
+                set_pixel(x, y, color);
+        }
+    }
+}
+
 void RasterCanvas::hatch_polygon(const std::vector<PointD>& pts, Rgba color, int spacing_px, bool back_diagonal)
 {
     if (pts.size() < 3)

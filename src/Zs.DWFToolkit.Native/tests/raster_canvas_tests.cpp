@@ -144,6 +144,19 @@ int main()
         expect(is_color(pixel_at(c, 50, 51), 255, 255, 255), "blend_coverage zero coverage leaves background");
     }
 
+    // fill_contours with an outer square and an inner square hole (even-odd): the
+    // ring is painted, the hole stays background.
+    {
+        RasterCanvas c(100, 100, unit_box());
+        std::vector<std::vector<PointD>> contours = {
+            {{10, 10}, {90, 10}, {90, 90}, {10, 90}},   // outer
+            {{40, 40}, {60, 40}, {60, 60}, {40, 60}},   // hole
+        };
+        c.fill_contours(contours, red);
+        expect(is_color(pixel_at(c, 20, 50), 255, 0, 0), "contour ring is filled");
+        expect(is_color(pixel_at(c, 50, 50), 255, 255, 255), "contour hole stays background");
+    }
+
     // Box downsample averages blocks: a 2x2 black/white checker becomes mid-gray.
     {
         std::vector<Rgba> src = {

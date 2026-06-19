@@ -58,6 +58,7 @@ namespace
         int text_count{0};
         int image_count{0};
         int polytriangle_count{0};
+        int contour_set_count{0};
         int unsupported_count{0};
         zs::dwf::text::TextRenderer* text{nullptr};
     };
@@ -171,6 +172,39 @@ namespace
                 c->canvas->fill_polygon(pts, color);
             }
             c->canvas->draw_polyline(pts, color, current_thickness(file, c->canvas), true);
+        }
+        return WT_Result::Success;
+    }
+
+    WT_Result on_contour_set(WT_Contour_Set& item, WT_File& file)
+    {
+        W2dContext* c = ctx(file);
+        if (!c) return WT_Result::Internal_Error;
+        c->contour_set_count++;
+
+        // Slice the flat point array into per-contour rings using the counts list.
+        std::vector<std::vector<PointD>> rings;
+        const WT_Logical_Point* pts = item.points();
+        const WT_Integer32* counts = item.counts();
+        if (pts && counts)
+        {
+            int idx = 0;
+            for (int ci = 0; ci < item.contours(); ++ci)
+            {
+                std::vector<PointD> ring;
+                for (int k = 0; k < counts[ci]; ++k, ++idx)
+                    ring.push_back({ static_cast<double>(pts[idx].m_x), static_cast<double>(pts[idx].m_y) });
+                rings.push_back(std::move(ring));
+            }
+        }
+
+        if (c->collecting)
+        {
+            for (const auto& r : rings) include_points(c->bounds, r);
+        }
+        else if (c->canvas && is_visible(file))
+        {
+            c->canvas->fill_contours(rings, current_color(file));
         }
         return WT_Result::Success;
     }
@@ -516,6 +550,7 @@ namespace
         file.set_text_action(on_text);
         file.set_image_action(on_image);
         file.set_polytriangle_action(on_polytriangle);
+        file.set_contour_set_action(on_contour_set);
         file.set_viewport_action(on_viewport);
         file.set_view_action(on_view);
 
