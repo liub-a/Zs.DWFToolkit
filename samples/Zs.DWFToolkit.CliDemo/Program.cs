@@ -141,7 +141,14 @@ internal sealed class CliApp
         options.MutoolPath = GetOption("--mutool");
         options.GhostXpsPath = GetOption("--gxps");
         options.PreferNativeDwfRenderer = HasFlag("--native");
+        options.ExtractRasterImagesFallback = !HasFlag("--no-raster-fallback");
         options.ExtractThumbnailFallback = !HasFlag("--no-thumb-fallback");
+        options.CreatePdfFromImagesFallback = !HasFlag("--no-image-pdf-fallback");
+        options.KeepTemporaryFiles = HasFlag("--keep-temp");
+        if (long.TryParse(GetOption("--min-image-bytes"), out var minBytes)) options.RasterImageMinBytes = minBytes;
+        if (double.TryParse(GetOption("--pdf-width"), out var pdfWidth)) options.PdfPageWidthPoints = pdfWidth;
+        if (double.TryParse(GetOption("--pdf-height"), out var pdfHeight)) options.PdfPageHeightPoints = pdfHeight;
+        if (double.TryParse(GetOption("--pdf-margin"), out var pdfMargin)) options.PdfMarginPoints = pdfMargin;
         return options;
     }
 
@@ -172,16 +179,26 @@ Zs.DWFToolkit.CliDemo
 Usage:
   Zs.DWFToolkit.CliDemo info <file.dwf|file.dwfx>
   Zs.DWFToolkit.CliDemo thumbnail <file.dwf|file.dwfx> --out <thumb.jpg>
-  Zs.DWFToolkit.CliDemo to-images <file.dwfx|file.dwf> --out-dir <dir> [--dpi 200] [--format png] [--mutool /path/mutool] [--native]
-  Zs.DWFToolkit.CliDemo to-pdf <file.dwfx> --out <output.pdf> [--mutool /path/mutool] [--gxps /path/gxps]
+  Zs.DWFToolkit.CliDemo to-images <file.dwfx|file.dwf> --out-dir <dir> [--dpi 200] [--format png] [--mutool /path/mutool] [--gxps /path/gxps] [--native]
+  Zs.DWFToolkit.CliDemo to-pdf <file.dwfx|file.dwf> --out <output.pdf> [--mutool /path/mutool] [--gxps /path/gxps] [--native]
   Zs.DWFToolkit.CliDemo extract <file.dwf|file.dwfx> --out-dir <dir>
   Zs.DWFToolkit.CliDemo copy <file.dwf|file.dwfx> --out <copy.dwf>
   Zs.DWFToolkit.CliDemo replace-entry <file.dwf|file.dwfx> --entry <package/path> --file <replacement> --out <new.dwf>
 
+Options:
+  --no-raster-fallback       Disable embedded raster page/preview extraction for ordinary DWF.
+  --no-thumb-fallback        Disable embedded thumbnail fallback.
+  --no-image-pdf-fallback    Disable ordinary DWF image-to-PDF fallback.
+  --min-image-bytes <n>      Minimum embedded raster resource size; default 4096.
+  --pdf-width <points>       Fixed PDF page width for simple image PDF writer.
+  --pdf-height <points>      Fixed PDF page height for simple image PDF writer.
+  --pdf-margin <points>      Margin for simple image PDF writer.
+  --keep-temp                Keep temporary images generated while creating PDF.
+
 Notes:
-  - DWFx/XPS image/PDF conversion uses external tools such as MuPDF mutool or GhostXPS.
-  - Plain DWF conversion needs a real native DWF/W2D renderer. The included native project is a bridge/stub.
-  - Plain DWF fallback can extract embedded thumbnail images.
+  - DWFx/XPS image/PDF conversion uses external tools such as MuPDF mutool or GhostXPS/gxps.
+  - Plain DWF conversion first tries native rendering when --native is enabled.
+  - Without native rendering, ordinary DWF can still extract embedded raster page/preview images and assemble a fallback PDF.
 """);
     }
 }
