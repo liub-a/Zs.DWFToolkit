@@ -8,12 +8,12 @@
 - ZIP/OPC 包结构读取；
 - DWFx/XPS FixedPage 页信息读取；
 - DWF 包内 `.w2d` 资源初步识别；
-- 包内缩略图/预览图提取；
+- 包内缩略图提取；
 - DWFx/XPS 通过外部工具转 PDF；
 - DWFx/XPS 通过 `mutool` 或 `gxps` 转 PNG/JPEG；
 - 普通 DWF 通过 Native Bridge 尝试转图片；
-- 普通 DWF 在没有完整渲染器时，可提取包内 raster/page preview 图片；
-- 普通 DWF 可通过“Native/内嵌图片 → 图片 → PDF”生成兜底 PDF；
+- 普通 DWF 需要 Native W2D/DWF 渲染器；没有真实渲染器时返回错误，不把 raster/page preview 或缩略图当成转换成功；
+- 普通 DWF 可通过“Native 渲染图片 → PDF”生成栅格 PDF；
 - C# 调用 Demo；
 - C++ Native ABI Stub；
 - 设计文档和扩展说明。
@@ -30,8 +30,8 @@
 | DWF/DWFx 缩略图提取 | 已实现 |
 | DWFx/XPS 转图片 | 已实现外部工具适配，优先 `mutool`，可兜底 `gxps` |
 | DWFx/XPS 转 PDF | 已实现外部工具适配，依赖 `mutool` 或 `gxps` |
-| 普通 DWF 转图片 | Native Bridge + raster resource extraction + thumbnail fallback |
-| 普通 DWF 转 PDF | Native/内嵌 raster/thumbnail → 图片 → PDF；支持 `mutool` 或内置简易 JPEG/PNG PDF writer |
+| 普通 DWF 转图片 | 需要 Native Bridge 对接真实 W2D/DWF 渲染器；未实现时返回 `unsupported_dwf_rendering` |
+| 普通 DWF 转 PDF | Native 渲染图片 → PDF；未实现 Native 渲染时返回 `unsupported_dwf_rendering` |
 
 ## 工程结构
 
@@ -87,27 +87,33 @@ dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-images ./test.dwfx --ou
 dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-pdf ./test.dwfx --out ./out/test.pdf
 ```
 
-### 6. 普通 DWF 转图片兜底
+### 6. 普通 DWF 转图片
 
-如果普通 DWF 是 ZIP/OPC 包并包含 raster preview/page image，可以直接提取：
+普通 `.dwf` 不再默认提取包内 raster/page preview 或 thumbnail 作为页面转换结果，因为这些资源经常是不完整预览，不能用于签章定位。
 
-```bash
-dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-images ./test.dwf --out-dir ./out/dwf-images
-```
-
-启用 Native 渲染优先：
+必须接入真实 Native W2D/DWF 渲染器后再启用：
 
 ```bash
 dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-images ./test.dwf --out-dir ./out/dwf-images --native --width 4960 --height 3508 --dpi 300
 ```
 
-### 7. 普通 DWF 转 PDF 兜底
+如果 Native 渲染器不可用，命令会返回 `unsupported_dwf_rendering`。
+
+### 7. 普通 DWF 转 PDF
+
+普通 `.dwf` 转 PDF 走真实渲染链：
+
+```text
+Native W2D/DWF 渲染每页图片
+  → mutool convert 合成 PDF
+  → 没有 mutool 时使用 SimpleImagePdfWriter 尝试合成栅格 PDF
+```
+
+没有 Native 渲染器时同样返回 `unsupported_dwf_rendering`，不会用缩略图冒充转换结果。
 
 ```bash
 dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-pdf ./test.dwf --out ./out/test.pdf --native --format jpg
 ```
-
-优先顺序：Native 渲染图片 → 包内 raster image 提取 → thumbnail fallback → 图片合成 PDF。
 
 ### 8. 构建 Native Stub
 
@@ -147,15 +153,8 @@ var images = await toolkit.ConvertToImagesAsync(
     });
 
 var pdf = await toolkit.ConvertToPdfAsync(
-    "drawing.dwf",
-    "drawing.pdf",
-    new DwfRenderOptions
-    {
-        PreferNativeDwfRenderer = true,
-        ExtractRasterImagesFallback = true,
-        CreatePdfFromImagesFallback = true,
-        ImageFormat = "jpg"
-    });
+    "drawing.dwfx",
+    "drawing.pdf");
 ```
 
 ## 后续实现普通 DWF 转图片的位置
@@ -190,8 +189,9 @@ zs_dwf_render_page(...)
 第一版建议：
 
 ```text
-普通 DWF：先尝试 Native；失败后提取内嵌 raster preview/page images；再失败提取 thumbnail
+普通 DWF：缩略图只用于列表/附件识别，不用于签章定位
 DWFx：尝试 mutool/gxps 转图片和 PDF
+普通 DWF：只接受 Native 真实渲染结果；没有渲染器就返回 unsupported_dwf_rendering
 后续：如果客户强依赖普通 DWF 单文件高保真预览，再实现完整 W2D 渲染或接商业库
 ```
 
