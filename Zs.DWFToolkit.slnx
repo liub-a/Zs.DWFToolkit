@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Zs.DWFToolkit/Zs.DWFToolkit.csproj" />
+  <Project Path="samples/Zs.DWFToolkit.CliDemo/Zs.DWFToolkit.CliDemo.csproj" />
+</Solution>
