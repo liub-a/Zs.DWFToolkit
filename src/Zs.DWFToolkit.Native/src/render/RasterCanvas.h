@@ -50,6 +50,8 @@ public:
     int height() const { return _height; }
     const BoxD& logical_box() const { return _logical_box; }
     double scale() const { return _scale; }
+    double offset_x() const { return _offset_x; }
+    double offset_y() const { return _offset_y; }
     const std::vector<Rgba>& pixels() const { return _pixels; }
 
     PointD to_pixel(PointD p) const;
