@@ -12,6 +12,7 @@
 #ifdef ZS_DWF_WITH_ODA_DWFTK
 #include "whiptk/whip_toolkit.h"
 #include "../text/TextRenderer.h"
+#include "../image/Group4Decoder.h"
 #include <csetjmp>
 #include <cstdio>
 extern "C" {
@@ -404,6 +405,21 @@ namespace
         if (fmt == static_cast<WT_Byte>(WT_Image::JPEG))
         {
             return decode_jpeg(data, static_cast<std::size_t>(data_size), out, w, h);
+        }
+        // Group4X fax: decode the bitstream to 1bpp indices, then map through the
+        // 2-entry color map (requires ZS_DWF_WITH_TIFF; otherwise falls through).
+        if (fmt == 0x0D) // WD_IMAGE_GROUP4X_MAPPED_EXT_OPCODE
+        {
+            const WT_Color_Map* cm = img.color_map();
+            std::vector<std::uint8_t> idx;
+            if (!cm || !zs::dwf::image::decode_group4(data, static_cast<std::size_t>(data_size), w, h, idx))
+                return false;
+            for (std::size_t i = 0; i < pixel_count && i < idx.size(); ++i)
+            {
+                const WT_RGBA32 c = cm->map(idx[i]);
+                out[i] = { c.m_rgb.r, c.m_rgb.g, c.m_rgb.b, c.m_rgb.a };
+            }
+            return true;
         }
         // Bitonal/Group3X/Group4 fax encodings still need a decoder we do not ship.
         return false;

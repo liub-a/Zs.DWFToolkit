@@ -81,7 +81,7 @@ jobs:
 
       - name: Configure + build (ODA + FreeType + tests)
         run: |
-          cmake -S src/Zs.DWFToolkit.Native -B build/native-oda -DZS_DWF_ENABLE_ODA_DWFTK=ON -DZS_DWF_WITH_FREETYPE=ON -DZS_DWF_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+          cmake -S src/Zs.DWFToolkit.Native -B build/native-oda -DZS_DWF_ENABLE_ODA_DWFTK=ON -DZS_DWF_WITH_FREETYPE=ON -DZS_DWF_WITH_TIFF=ON -DZS_DWF_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
           # Bounded parallelism: each WhipTk TU needs ~GBs; -j unbounded OOM-kills the runner.
           cmake --build build/native-oda --config Release -j 2
 

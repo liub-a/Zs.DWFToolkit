@@ -15,6 +15,7 @@ add_library(zs_dwf_toolkit_native SHARED
     src/render/MinimalPng.cpp
     src/render/RasterCanvas.cpp
     src/text/TextRenderer.cpp
+    src/image/Group4Decoder.cpp
     src/w2d/W2dWhipRenderer.cpp
     src/dwf/OdaDwfAdapter.cpp
 )
@@ -64,6 +65,35 @@ if(ZS_DWF_WITH_FREETYPE)
     target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_WITH_FREETYPE=1)
     target_include_directories(zs_dwf_toolkit_native PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
     target_link_libraries(zs_dwf_toolkit_native PRIVATE freetype)
+endif()
+
+option(ZS_DWF_WITH_TIFF "Decode Group4X fax W2D images via a vendored libtiff" OFF)
+if(ZS_DWF_WITH_TIFF)
+    # Vendor libtiff (static, codecs/tools off) so Group4 (CCITT T.6) fax images
+    # decode without a system libtiff. The CCITT fax codec is built into libtiff.
+    include(FetchContent)
+    set(tiff-tools OFF CACHE BOOL "" FORCE)
+    set(tiff-tests OFF CACHE BOOL "" FORCE)
+    set(tiff-docs OFF CACHE BOOL "" FORCE)
+    set(tiff-contrib OFF CACHE BOOL "" FORCE)
+    set(jpeg OFF CACHE BOOL "" FORCE)
+    set(old-jpeg OFF CACHE BOOL "" FORCE)
+    set(jbig OFF CACHE BOOL "" FORCE)
+    set(lzma OFF CACHE BOOL "" FORCE)
+    set(zstd OFF CACHE BOOL "" FORCE)
+    set(webp OFF CACHE BOOL "" FORCE)
+    set(zlib OFF CACHE BOOL "" FORCE)
+    set(libdeflate OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF)
+    FetchContent_Declare(
+        tiff
+        GIT_REPOSITORY https://gitlab.com/libtiff/libtiff.git
+        GIT_TAG v4.6.0
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(tiff)
+    target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_WITH_TIFF=1)
+    target_link_libraries(zs_dwf_toolkit_native PRIVATE tiff)
 endif()
 
 if(ZS_DWF_ENABLE_ODA_DWFTK)
@@ -188,5 +218,12 @@ if(ZS_DWF_BUILD_TESTS)
                 ZS_DWF_OCEAN_NONWHITE=${ZS_DWF_OCEAN_NONWHITE})
         endif()
         add_test(NAME ocean_regression_tests COMMAND ocean_regression_tests)
+
+        if(ZS_DWF_WITH_TIFF)
+            add_executable(group4_tests tests/group4_tests.cpp)
+            target_include_directories(group4_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+            target_link_libraries(group4_tests PRIVATE zs_dwf_toolkit_native tiff)
+            add_test(NAME group4_tests COMMAND group4_tests)
+        endif()
     endif()
 endif()
