@@ -16,4 +16,18 @@ public static class DwfErrorCodes
     public const string Timeout = "timeout";
     public const string OutputFailed = "output_failed";
     public const string NoThumbnail = "no_thumbnail";
+
+    /// <summary>Package inspection failed (corrupt/unreadable DWF/DWFx structure).</summary>
+    public const string ReadFailed = "read_failed";
+
+    // Codes emitted by the native W2D/DWF renderer; declared here so managed and
+    // native layers share one vocabulary when surfacing native errors.
+    public const string PageNotFound = "page_not_found";
+    public const string W2dResourceNotFound = "w2d_resource_not_found";
+    public const string W2dExtractFailed = "w2d_extract_failed";
+    public const string W2dParseFailed = "w2d_parse_failed";
+    public const string W2dEmptyBounds = "w2d_empty_bounds";
+    public const string W2dRenderFailed = "w2d_render_failed";
+    public const string DwfToolkitException = "dwf_toolkit_exception";
+    public const string NativeException = "native_exception";
 }
