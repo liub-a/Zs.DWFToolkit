@@ -14,7 +14,7 @@ public sealed class NativeDwfRenderer : INativeDwfRenderer
         {
             try
             {
-                _ = NativeMethods.GetLastErrorString();
+                NativeMethods.ProbeLoad();
                 return true;
             }
             catch (DllNotFoundException)

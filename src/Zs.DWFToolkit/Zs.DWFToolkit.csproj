@@ -8,4 +8,7 @@
     <Description>DWF/DWFx package inspection, thumbnail extraction, DWFX conversion adapters and native DWF Toolkit bridge.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Zs.DWFToolkit.Tests" />
+  </ItemGroup>
 </Project>

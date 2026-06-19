@@ -35,6 +35,13 @@ internal static partial class NativeMethods
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, EntryPoint = "zs_dwf_get_last_error")]
     internal static extern IntPtr GetLastErrorPtr();
 
+    /// <summary>
+    /// Invokes the native library directly so a missing/incompatible binary surfaces
+    /// as DllNotFoundException/BadImageFormatException to the caller. Unlike
+    /// <see cref="GetLastErrorString"/> this does not swallow load failures.
+    /// </summary>
+    internal static void ProbeLoad() => _ = GetLastErrorPtr();
+
     internal static string? GetLastErrorString()
     {
         try
