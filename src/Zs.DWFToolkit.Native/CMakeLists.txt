@@ -166,5 +166,27 @@ if(ZS_DWF_BUILD_TESTS)
         endif()
         target_link_libraries(w2d_roundtrip_tests PRIVATE ZLIB::ZLIB JPEG::JPEG)
         add_test(NAME w2d_roundtrip_tests COMMAND w2d_roundtrip_tests)
+
+        # Regression against the public ocean_90.w2d sample (path via ZS_DWF_OCEAN_W2D;
+        # no-op pass when unset). Baselines are defined here once captured.
+        add_executable(ocean_regression_tests tests/ocean_regression_tests.cpp)
+        target_include_directories(ocean_regression_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+        )
+        target_link_libraries(ocean_regression_tests PRIVATE zs_dwf_toolkit_native)
+        # Baselines captured from ocean_90.w2d at 1000x800. Counts are exact
+        # (deterministic parse); non-white pixels assert within a +/-15% band.
+        set(ZS_DWF_OCEAN_POLYLINE 6977 CACHE STRING "ocean baseline polyline count")
+        set(ZS_DWF_OCEAN_POLYGON 0 CACHE STRING "ocean baseline polygon count")
+        set(ZS_DWF_OCEAN_NONWHITE 145084 CACHE STRING "ocean baseline non-white pixels")
+        if(DEFINED ZS_DWF_OCEAN_NONWHITE)
+            target_compile_definitions(ocean_regression_tests PRIVATE
+                ZS_DWF_OCEAN_ASSERT=1
+                ZS_DWF_OCEAN_POLYLINE=${ZS_DWF_OCEAN_POLYLINE}
+                ZS_DWF_OCEAN_POLYGON=${ZS_DWF_OCEAN_POLYGON}
+                ZS_DWF_OCEAN_NONWHITE=${ZS_DWF_OCEAN_NONWHITE})
+        endif()
+        add_test(NAME ocean_regression_tests COMMAND ocean_regression_tests)
     endif()
 endif()

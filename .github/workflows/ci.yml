@@ -85,7 +85,13 @@ jobs:
           # Bounded parallelism: each WhipTk TU needs ~GBs; -j unbounded OOM-kills the runner.
           cmake --build build/native-oda --config Release -j 2
 
-      - name: Run native tests (RasterCanvas + W2D round-trip)
+      - name: Fetch ocean_90.w2d regression sample
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/ocean_90.w2d" \
+            https://raw.githubusercontent.com/AvalonHolographics/DWFToolkit/master/samples/DWFToolkit/WriteContent/ocean_90.w2d
+          echo "ZS_DWF_OCEAN_W2D=$RUNNER_TEMP/ocean_90.w2d" >> "$GITHUB_ENV"
+
+      - name: Run native tests (RasterCanvas + W2D round-trip + ocean regression)
         run: ctest --test-dir build/native-oda --output-on-failure
 
       - name: Upload library
