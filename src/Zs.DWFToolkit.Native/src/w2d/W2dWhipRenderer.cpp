@@ -58,6 +58,14 @@ namespace
         return static_cast<W2dContext*>(file.heuristics().user_data());
     }
 
+    // The current rendition visibility, updated by WT_Visibility/WT_Layer opcodes
+    // via their default processing. Invisible geometry (e.g. hidden layers) is
+    // skipped during the painting pass.
+    bool is_visible(WT_File& file)
+    {
+        return file.rendition().visibility().visible() != 0;
+    }
+
     Rgba current_color(WT_File& file)
     {
         const WT_RGBA32 rgba = file.rendition().color().rgba();
@@ -116,7 +124,7 @@ namespace
         {
             include_points(c->bounds, pts);
         }
-        else if (c->canvas)
+        else if (c->canvas && is_visible(file))
         {
             const auto [on, off] = current_dash(file, c->canvas);
             const int thick = current_thickness(file, c->canvas);
@@ -138,7 +146,7 @@ namespace
         {
             include_points(c->bounds, pts);
         }
-        else if (c->canvas)
+        else if (c->canvas && is_visible(file))
         {
             const auto color = current_color(file);
             c->canvas->fill_polygon(pts, color);
@@ -165,7 +173,7 @@ namespace
         {
             include_ellipse(c->bounds, item);
         }
-        else if (c->canvas)
+        else if (c->canvas && is_visible(file))
         {
             c->canvas->draw_ellipse(
                 { static_cast<double>(item.position().m_x), static_cast<double>(item.position().m_y) },
@@ -187,7 +195,7 @@ namespace
         {
             include_ellipse(c->bounds, item);
         }
-        else if (c->canvas)
+        else if (c->canvas && is_visible(file))
         {
             c->canvas->fill_ellipse(
                 { static_cast<double>(item.position().m_x), static_cast<double>(item.position().m_y) },
@@ -211,7 +219,7 @@ namespace
             c->bounds.include(p.x, p.y);
             c->bounds.include(p.x + glyphs * 64.0, p.y + 128.0);
         }
-        else if (c->canvas)
+        else if (c->canvas && is_visible(file))
         {
             c->canvas->draw_text_marker(p, glyphs, current_color(file), current_thickness(file, c->canvas));
         }
@@ -276,7 +284,7 @@ namespace
             c->bounds.include(rect);
             return WT_Result::Success;
         }
-        if (!c->canvas)
+        if (!c->canvas || !is_visible(file))
             return WT_Result::Success;
 
         std::vector<Rgba> pixels;
