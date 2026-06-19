@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Zs.DWFToolkit</AssemblyName>
+    <RootNamespace>Zs.DWFToolkit</RootNamespace>
+    <PackageId>Zs.DWFToolkit</PackageId>
+    <Authors>Zs</Authors>
+    <Description>DWF/DWFx package inspection, thumbnail extraction, DWFX conversion adapters and native DWF Toolkit bridge.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+</Project>

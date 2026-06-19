@@ -1,0 +1,11 @@
+bin/
+obj/
+artifacts/
+.vs/
+.idea/
+*.user
+*.suo
+*.nupkg
+.DS_Store
+# Expanded third-party source. Keep the compact archive under third_party/archives tracked.
+third_party/DWFToolkit-7.7/
