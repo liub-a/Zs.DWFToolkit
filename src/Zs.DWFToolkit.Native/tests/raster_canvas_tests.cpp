@@ -82,6 +82,20 @@ int main()
         expect(is_color(pixel_at(c, 50, 50), 255, 255, 255), "draw_image skips transparent pixels");
     }
 
+    // A clip rectangle suppresses drawing outside it and restores on clear_clip.
+    {
+        RasterCanvas c(100, 100, unit_box());
+        c.set_clip(BoxD{40, 40, 60, 60});
+        std::vector<PointD> full = {{0, 50}, {100, 50}};
+        c.draw_polyline(full, blue, 1);
+        expect(is_color(pixel_at(c, 50, 50), 0, 0, 255), "clip keeps pixels inside the region");
+        expect(is_color(pixel_at(c, 10, 50), 255, 255, 255), "clip drops pixels outside the region");
+
+        c.clear_clip();
+        c.draw_polyline(full, red, 1);
+        expect(is_color(pixel_at(c, 10, 50), 255, 0, 0), "clear_clip restores full-canvas drawing");
+    }
+
     if (g_failures == 0)
     {
         std::printf("All RasterCanvas tests passed.\n");

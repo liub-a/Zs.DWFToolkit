@@ -272,6 +272,30 @@ namespace
         return WT_Result::Success;
     }
 
+    // Approximates the W2D viewport clip as the axis-aligned bounding box of its
+    // boundary contour. Non-rectangular clips are over-inclusive (bbox), never
+    // under-inclusive, so no in-bounds content is wrongly dropped.
+    WT_Result on_viewport(WT_Viewport& item, WT_File& file)
+    {
+        W2dContext* c = ctx(file);
+        if (!c || c->collecting || !c->canvas)
+            return WT_Viewport::default_process(item, file);
+
+        const WT_Contour_Set* contour = item.contour();
+        if (!contour || contour->total_points() <= 0 || contour->points() == nullptr)
+        {
+            c->canvas->clear_clip();
+            return WT_Viewport::default_process(item, file);
+        }
+
+        BoxD clip;
+        const WT_Logical_Point* pts = contour->points();
+        for (int i = 0; i < contour->total_points(); ++i)
+            clip.include(static_cast<double>(pts[i].m_x), static_cast<double>(pts[i].m_y));
+        c->canvas->set_clip(clip);
+        return WT_Viewport::default_process(item, file);
+    }
+
     WT_Result on_view(WT_View& item, WT_File& file)
     {
         W2dContext* c = ctx(file);
@@ -296,6 +320,7 @@ namespace
         file.set_filled_ellipse_action(on_filled_ellipse);
         file.set_text_action(on_text);
         file.set_image_action(on_image);
+        file.set_viewport_action(on_viewport);
         file.set_view_action(on_view);
 
         WT_Result result = file.open();

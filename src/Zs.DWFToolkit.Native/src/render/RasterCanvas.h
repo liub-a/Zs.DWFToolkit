@@ -73,6 +73,11 @@ public:
                     int src_h,
                     const std::vector<Rgba>& src_pixels);
 
+    // Restrict subsequent drawing to the pixels inside this logical rectangle
+    // (mapped through the same transform). Used for W2D viewport/clip regions.
+    void set_clip(const BoxD& logical_rect);
+    void clear_clip();
+
 private:
     void set_pixel(int x, int y, Rgba color);
     void draw_disc(int cx, int cy, int radius, Rgba color);
@@ -83,6 +88,11 @@ private:
     double _scale{1};
     double _offset_x{0};
     double _offset_y{0};
+    bool _has_clip{false};
+    int _clip_x0{0};
+    int _clip_y0{0};
+    int _clip_x1{0};
+    int _clip_y1{0};
     std::vector<Rgba> _pixels;
 };
 

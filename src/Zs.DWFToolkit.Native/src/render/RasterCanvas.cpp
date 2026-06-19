@@ -50,7 +50,30 @@ void RasterCanvas::set_pixel(int x, int y, Rgba color)
 {
     if (x < 0 || y < 0 || x >= _width || y >= _height)
         return;
+    if (_has_clip && (x < _clip_x0 || y < _clip_y0 || x > _clip_x1 || y > _clip_y1))
+        return;
     _pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(_width) + static_cast<std::size_t>(x)] = color;
+}
+
+void RasterCanvas::set_clip(const BoxD& logical_rect)
+{
+    if (!logical_rect.valid())
+    {
+        clear_clip();
+        return;
+    }
+    const auto a = to_pixel({ logical_rect.min_x, logical_rect.max_y });
+    const auto b = to_pixel({ logical_rect.max_x, logical_rect.min_y });
+    _clip_x0 = clamp_int(static_cast<int>(std::floor(std::min(a.x, b.x))), 0, _width - 1);
+    _clip_x1 = clamp_int(static_cast<int>(std::ceil(std::max(a.x, b.x))), 0, _width - 1);
+    _clip_y0 = clamp_int(static_cast<int>(std::floor(std::min(a.y, b.y))), 0, _height - 1);
+    _clip_y1 = clamp_int(static_cast<int>(std::ceil(std::max(a.y, b.y))), 0, _height - 1);
+    _has_clip = true;
+}
+
+void RasterCanvas::clear_clip()
+{
+    _has_clip = false;
 }
 
 void RasterCanvas::draw_disc(int cx, int cy, int radius, Rgba color)
