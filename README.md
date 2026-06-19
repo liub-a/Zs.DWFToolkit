@@ -10,8 +10,10 @@
 - DWF 包内 `.w2d` 资源初步识别；
 - 包内缩略图/预览图提取；
 - DWFx/XPS 通过外部工具转 PDF；
-- DWFx/XPS 通过外部工具转 PNG/JPEG；
-- 普通 DWF 转图 Native Bridge 骨架；
+- DWFx/XPS 通过 `mutool` 或 `gxps` 转 PNG/JPEG；
+- 普通 DWF 通过 Native Bridge 尝试转图片；
+- 普通 DWF 在没有完整渲染器时，可提取包内 raster/page preview 图片；
+- 普通 DWF 可通过“Native/内嵌图片 → 图片 → PDF”生成兜底 PDF；
 - C# 调用 Demo；
 - C++ Native ABI Stub；
 - 设计文档和扩展说明。
@@ -26,10 +28,10 @@
 |---|---|
 | DWF/DWFx 包信息读取 | 已实现基础版 |
 | DWF/DWFx 缩略图提取 | 已实现 |
-| DWFx/XPS 转图片 | 已实现外部工具适配，依赖 `mutool` |
+| DWFx/XPS 转图片 | 已实现外部工具适配，优先 `mutool`，可兜底 `gxps` |
 | DWFx/XPS 转 PDF | 已实现外部工具适配，依赖 `mutool` 或 `gxps` |
-| 普通 DWF 转图片 | Native Bridge 已搭好，渲染器待实现 |
-| 普通 DWF 转 PDF | 正式渲染待实现；可用缩略图 + mutool 做兜底 PDF |
+| 普通 DWF 转图片 | Native Bridge + raster resource extraction + thumbnail fallback |
+| 普通 DWF 转 PDF | Native/内嵌 raster/thumbnail → 图片 → PDF；支持 `mutool` 或内置简易 JPEG/PNG PDF writer |
 
 ## 工程结构
 
@@ -85,7 +87,29 @@ dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-images ./test.dwfx --ou
 dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-pdf ./test.dwfx --out ./out/test.pdf
 ```
 
-### 6. 构建 Native Stub
+### 6. 普通 DWF 转图片兜底
+
+如果普通 DWF 是 ZIP/OPC 包并包含 raster preview/page image，可以直接提取：
+
+```bash
+dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-images ./test.dwf --out-dir ./out/dwf-images
+```
+
+启用 Native 渲染优先：
+
+```bash
+dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-images ./test.dwf --out-dir ./out/dwf-images --native --width 4960 --height 3508 --dpi 300
+```
+
+### 7. 普通 DWF 转 PDF 兜底
+
+```bash
+dotnet run --project samples/Zs.DWFToolkit.CliDemo -- to-pdf ./test.dwf --out ./out/test.pdf --native --format jpg
+```
+
+优先顺序：Native 渲染图片 → 包内 raster image 提取 → thumbnail fallback → 图片合成 PDF。
+
+### 8. 构建 Native Stub
 
 ```bash
 ./scripts/build-native.sh
@@ -123,8 +147,15 @@ var images = await toolkit.ConvertToImagesAsync(
     });
 
 var pdf = await toolkit.ConvertToPdfAsync(
-    "drawing.dwfx",
-    "drawing.pdf");
+    "drawing.dwf",
+    "drawing.pdf",
+    new DwfRenderOptions
+    {
+        PreferNativeDwfRenderer = true,
+        ExtractRasterImagesFallback = true,
+        CreatePdfFromImagesFallback = true,
+        ImageFormat = "jpg"
+    });
 ```
 
 ## 后续实现普通 DWF 转图片的位置
@@ -159,9 +190,9 @@ zs_dwf_render_page(...)
 第一版建议：
 
 ```text
-普通 DWF：提取缩略图 + 要求上传配套 PDF
+普通 DWF：先尝试 Native；失败后提取内嵌 raster preview/page images；再失败提取 thumbnail
 DWFx：尝试 mutool/gxps 转图片和 PDF
-后续：如果客户强依赖普通 DWF 单文件预览，再实现 Native 渲染或接商业库
+后续：如果客户强依赖普通 DWF 单文件高保真预览，再实现完整 W2D 渲染或接商业库
 ```
 
 ## ODA 修改版 DWF Toolkit
