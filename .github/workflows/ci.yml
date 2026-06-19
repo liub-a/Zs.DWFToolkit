@@ -64,14 +64,12 @@ jobs:
   native-oda:
     name: Native build (ODA W2D renderer)
     runs-on: ubuntu-latest
-    # The ODA path is allowed to fail until the bundled toolkit builds cleanly on
-    # CI; it still surfaces compile errors without blocking the rest of the matrix.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ unzip
+        # W3dTk needs libjpeg + zlib; verified to build+link locally on macOS.
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ unzip libjpeg-dev zlib1g-dev
 
       - name: Import ODA-modified DWF Toolkit source
         run: ./scripts/setup-oda-dwftoolkit.sh
@@ -79,7 +77,8 @@ jobs:
       - name: Configure + build (ZS_DWF_ENABLE_ODA_DWFTK=ON)
         run: |
           cmake -S src/Zs.DWFToolkit.Native -B build/native-oda -DZS_DWF_ENABLE_ODA_DWFTK=ON -DCMAKE_BUILD_TYPE=Release
-          cmake --build build/native-oda --target zs_dwf_toolkit_native --config Release -j
+          # Bounded parallelism: each WhipTk TU needs ~GBs; -j unbounded OOM-kills the runner.
+          cmake --build build/native-oda --target zs_dwf_toolkit_native --config Release -j 2
 
       - name: Upload library
         if: success()

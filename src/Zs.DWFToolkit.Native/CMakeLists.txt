@@ -54,6 +54,12 @@ if(ZS_DWF_ENABLE_ODA_DWFTK)
         ${ZS_DWF_ODA_DWFTK_ROOT}
     )
 
+    # W3dTk's BOpcodeHandler.cpp includes <jpeglib.h>, but the bundled ODA CMake
+    # never adds the directory that holds the vendored libjpeg headers. Inject it
+    # here (directory-scoped, so it propagates into the add_subdirectory tree below)
+    # so W3dTk compiles. DwfToolkit references W3dTk symbols, so it must be built.
+    include_directories("${ZS_DWF_ODA_DWFTK_ROOT}/develop/global/src/dwf/w3dtk/jpeg")
+
     # Add the Toolkit after the main shared library is declared so failures are
     # isolated behind the ZS_DWF_ENABLE_ODA_DWFTK option. If your platform still
     # needs additional ODA KernelBase headers, keep this option OFF and link
@@ -69,7 +75,19 @@ if(ZS_DWF_ENABLE_ODA_DWFTK)
     if(TARGET WhipTk)
         target_link_libraries(zs_dwf_toolkit_native PRIVATE WhipTk)
     endif()
+    # W3dTk (3D/eModel toolkit) is required because DwfToolkit references its
+    # opcode-handler symbols, even though this library only renders 2D W2D content.
     if(TARGET W3dTk)
         target_link_libraries(zs_dwf_toolkit_native PRIVATE W3dTk)
     endif()
+
+    # W3dTk pulls in libjpeg and zlib symbols. The toolkit ships jpeg headers but
+    # its bundled CMake builds neither library, so link the system ones (Homebrew
+    # jpeg-turbo on macOS; libjpeg-dev / zlib1g-dev on Linux CI).
+    if(APPLE)
+        list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/jpeg-turbo /usr/local/opt/jpeg-turbo)
+    endif()
+    find_package(ZLIB REQUIRED)
+    find_package(JPEG REQUIRED)
+    target_link_libraries(zs_dwf_toolkit_native PRIVATE ZLIB::ZLIB JPEG::JPEG)
 endif()
