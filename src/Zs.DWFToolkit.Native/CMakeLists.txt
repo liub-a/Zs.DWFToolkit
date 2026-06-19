@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(ZS_DWF_ENABLE_ODA_DWFTK "Build and link the bundled ODA-modified DWFToolkit-7.7 source" OFF)
+option(ZS_DWF_BUILD_TESTS "Build native RasterCanvas unit tests (CTest)" OFF)
 set(ZS_DWF_ODA_DWFTK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/DWFToolkit-7.7" CACHE PATH "Path to ODA-modified DWFToolkit-7.7 root")
 
 add_library(zs_dwf_toolkit_native SHARED
@@ -90,4 +91,15 @@ if(ZS_DWF_ENABLE_ODA_DWFTK)
     find_package(ZLIB REQUIRED)
     find_package(JPEG REQUIRED)
     target_link_libraries(zs_dwf_toolkit_native PRIVATE ZLIB::ZLIB JPEG::JPEG)
+endif()
+
+if(ZS_DWF_BUILD_TESTS)
+    enable_testing()
+    add_executable(raster_canvas_tests
+        tests/raster_canvas_tests.cpp
+        src/render/RasterCanvas.cpp
+        src/render/MinimalPng.cpp
+    )
+    target_include_directories(raster_canvas_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    add_test(NAME raster_canvas_tests COMMAND raster_canvas_tests)
 endif()
