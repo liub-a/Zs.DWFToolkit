@@ -25,17 +25,22 @@
 - 输出 PNG（MinimalPng）— done；
 - 返回坐标变换（render JSON `transform` → `DwfPageTransform`）— done。
 
-## V0.4 渲染增强（进行中）
+## V0.4 渲染增强（基本完成）
 
-- 图片资源 — 部分完成（原始 RGB/RGBA blit；mapped/Group4/JPEG 仍为灰底占位）；
-- 文字 — 占位框（未实现真字形）；
-- 字体 fallback — 待办；
-- 填充 / 线型 / 裁剪 / 图层 — 待办；
-- 大图瓦片 — 待办。
+- 图片资源 — done（RGB/RGBA/mapped/indexed/JPEG/bitonal/Group3X/Group4X 全解码，仅 PNG_Group4 opcode 占位）；
+- 文字 — done（FreeType 真字形，字体内嵌）；
+- 填充 — done（实心 + hatch + 轮廓集 even-odd 带洞）；
+- 线型 — done（实线 + 虚线/点线）；
+- 图层可见性 — done；
+- 三角带 / 标记 / 宏放置 — done（宏几何完整 replay 除外）；
+- 抗锯齿 — done（2× 超采样）；
+- 裁剪 — 部分（viewport bbox；非矩形裁剪待办）。
 
-> Native ODA 路径在 Linux/CI 编译验证；macOS 默认构建把 native 编译为返回
-> `unsupported_dwf_rendering` 的桩。所有 `WT_Image` / section API 已对照
-> `third_party/DWFToolkit-7.7` 真实头文件核对。
+> **端到端验证**：完整管线在真实 2D DWF 包（11 页 ePlot 工程图）上验证 ——
+> 托管读 DWF 6.x 包 → `OdaDwfAdapter` 逐页抽 W2D → `W2dWhipRenderer` 渲染 →
+> 11 张 1200×900 PNG，标题栏/表格/真字形/抗锯齿正确。
+> 自包含构建：FreeType/libtiff/zlib 源码入库 + libjpeg(系统优先/6b 回退)，
+> 产物仅依赖 libSystem+libc++。
 
 ## V1.0 产品化
 
