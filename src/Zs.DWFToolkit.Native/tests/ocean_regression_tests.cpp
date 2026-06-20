@@ -34,12 +34,19 @@ long json_int(const std::string& j, const std::string& key)
 
 int main()
 {
-    const char* w2d = std::getenv("ZS_DWF_OCEAN_W2D");
-    if (!w2d || !*w2d)
+    std::string w2d_path;
+    if (const char* env = std::getenv("ZS_DWF_OCEAN_W2D"))
+        w2d_path = env;
+#ifdef ZS_DWF_DATA_DIR
+    if (w2d_path.empty())
+        w2d_path = std::string(ZS_DWF_DATA_DIR) + "/ocean_90.w2d";
+#endif
+    if (w2d_path.empty())
     {
-        std::printf("ZS_DWF_OCEAN_W2D not set; skipping ocean regression.\n");
+        std::printf("no ocean sample available; skipping.\n");
         return 0;
     }
+    const char* w2d = w2d_path.c_str();
 
     const std::string png = std::string(std::getenv("TMPDIR") ? std::getenv("TMPDIR") : "/tmp") + "/ocean_reg.png";
     std::vector<char> json(1 << 18, 0);

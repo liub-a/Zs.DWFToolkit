@@ -219,6 +219,7 @@ if(ZS_DWF_BUILD_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/src
         )
         target_link_libraries(ocean_regression_tests PRIVATE zs_dwf_toolkit_native)
+        target_compile_definitions(ocean_regression_tests PRIVATE ZS_DWF_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../tests/data")
         # Baselines captured from ocean_90.w2d at 1000x800. Counts are exact
         # (deterministic parse); non-white pixels assert within a +/-15% band.
         set(ZS_DWF_OCEAN_POLYLINE 6977 CACHE STRING "ocean baseline polyline count")
@@ -232,6 +233,15 @@ if(ZS_DWF_BUILD_TESTS)
                 ZS_DWF_OCEAN_NONWHITE=${ZS_DWF_OCEAN_NONWHITE})
         endif()
         add_test(NAME ocean_regression_tests COMMAND ocean_regression_tests)
+
+        add_executable(dwf_package_tests tests/dwf_package_tests.cpp)
+        target_include_directories(dwf_package_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+        )
+        target_link_libraries(dwf_package_tests PRIVATE zs_dwf_toolkit_native)
+        target_compile_definitions(dwf_package_tests PRIVATE ZS_DWF_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../tests/data")
+        add_test(NAME dwf_package_tests COMMAND dwf_package_tests)
 
         if(ZS_DWF_WITH_TIFF)
             add_executable(group4_tests tests/group4_tests.cpp)
