@@ -1,0 +1,12 @@
+# Keep the build context small: the ODA toolkit is re-expanded from its archive,
+# and build artifacts are regenerated in the image.
+.git
+build/
+artifacts/
+**/bin/
+**/obj/
+third_party/DWFToolkit-7.7/
+.vs/
+.idea/
+*.user
+TestResults/

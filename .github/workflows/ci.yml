@@ -96,3 +96,15 @@ jobs:
           name: native-oda-linux-x64
           path: build/native-oda/libzs_dwf_toolkit_native.so
           if-no-files-found: warn
+
+  docker:
+    name: Docker image (manual)
+    # Heavy (full ODA build); run on demand rather than every push.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t zs-dwftoolkit .
+      - name: Smoke test (help)
+        run: docker run --rm zs-dwftoolkit --help
