@@ -36,6 +36,8 @@
 | 自包含构建 | FreeType/libtiff/zlib/字体 源码入库；jpeg 系统优先+6b 回退；零第三方系统库 |
 | 容器 | 多阶段 `Dockerfile` |
 
+> 把本库嵌入你的应用（签署系统/预览服务/批处理）：见 **[docs/INTEGRATION.md](docs/INTEGRATION.md)** —— 引用、Native 部署、进程内/外渲染、错误码、容器接入。
+
 ## 工程结构
 
 ```text
