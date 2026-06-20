@@ -11,27 +11,30 @@
 - 包内缩略图提取；
 - DWFx/XPS 通过外部工具转 PDF；
 - DWFx/XPS 通过 `mutool` 或 `gxps` 转 PNG/JPEG；
-- 普通 DWF 通过 Native Bridge 尝试转图片；
-- 普通 DWF 需要 Native W2D/DWF 渲染器；没有真实渲染器时返回错误，不把 raster/page preview 或缩略图当成转换成功；
-- 普通 DWF 可通过“Native 渲染图片 → PDF”生成栅格 PDF；
-- C# 调用 Demo；
-- C++ Native ABI Stub；
+- 普通 DWF 通过 Native W2D 渲染器（ODA Toolkit + WHIP）转图片/PDF，真实工程图端到端验证；
+- 没有 Native 渲染器时返回 `unsupported_dwf_rendering`，绝不把 raster/缩略图当成转换成功；
+- 进程外渲染隔离（`zs_dwf_worker`）：native 崩溃/卡死不拖垮宿主；
+- 自包含构建：FreeType/libtiff/zlib/字体源码入库，零第三方系统库；
+- C# 调用 Demo + 多阶段 Dockerfile；
 - 设计文档和扩展说明。
 
 ## 重要边界
 
-这个包 **没有内置完整 DWF/W2D 渲染器**。普通 `.dwf` 转 PNG/PDF 需要实现 Native 层的 DWF Toolkit + W2D/WHIP 渲染逻辑，或者接入商业渲染库。
+普通 `.dwf` 转 PNG/PDF 走 Native 层的 ODA DWF Toolkit + W2D/WHIP 渲染器（`-DZS_DWF_ENABLE_ODA_DWFTK=ON` 构建）。
+未构建 Native 渲染器时返回 `unsupported_dwf_rendering`，绝不拿缩略图冒充。3D（eModel）DWF 返回 `unsupported_3d_dwf`。
 
 当前能实际工作的部分：
 
 | 能力 | 当前状态 |
 |---|---|
-| DWF/DWFx 包信息读取 | 已实现基础版 |
+| DWF/DWFx 包信息读取 | 已实现（含 DWF v6 `(DWF Vxx)` 头部包） |
 | DWF/DWFx 缩略图提取 | 已实现 |
-| DWFx/XPS 转图片 | 已实现外部工具适配，优先 `mutool`，可兜底 `gxps` |
-| DWFx/XPS 转 PDF | 已实现外部工具适配，依赖 `mutool` 或 `gxps` |
-| 普通 DWF 转图片 | 需要 Native Bridge 对接真实 W2D/DWF 渲染器；未实现时返回 `unsupported_dwf_rendering` |
-| 普通 DWF 转 PDF | Native 渲染图片 → PDF；未实现 Native 渲染时返回 `unsupported_dwf_rendering` |
+| DWFx/XPS 转图片 / PDF | 外部工具适配，优先 `mutool`，兜底 `gxps` |
+| 普通 DWF 转图片 / PDF | **Native W2D 渲染器已实现**（ODA 构建），真实工程图端到端验证 |
+| Native 渲染器（W2D） | 折线/多边形/三角带/轮廓集/椭圆/真字形(FreeType)/标记/虚线/hatch/图层/裁剪/抗锯齿/图片(RGB·RGBA·mapped·JPEG·bitonal·G3/G4) |
+| 进程外渲染隔离 | `ProcessNativeDwfRenderer` + `zs_dwf_worker`：崩溃→失败、卡死→超时，宿主存活 |
+| 自包含构建 | FreeType/libtiff/zlib/字体 源码入库；jpeg 系统优先+6b 回退；零第三方系统库 |
+| 容器 | 多阶段 `Dockerfile` |
 
 ## 工程结构
 
@@ -157,44 +160,38 @@ var pdf = await toolkit.ConvertToPdfAsync(
     "drawing.pdf");
 ```
 
-## 后续实现普通 DWF 转图片的位置
+## Native 渲染架构（已实现）
 
-核心位置：
-
-```text
-src/Zs.DWFToolkit.Native/src/zs_dwf_toolkit_native.cpp
-```
-
-需要替换 Stub：
-
-```cpp
-zs_dwf_get_info_json(...)
-zs_dwf_render_page(...)
-```
-
-实现建议：
-
-1. 接入 Autodesk/ODA DWF Toolkit；
-2. 枚举 ePlot sections；
-3. 找到每页 W2D/WHIP 图形流；
-4. 实现 W2D 图元解释器；
-5. 用 Skia/Cairo 渲染；
-6. 输出 PNG/JPEG；
-7. 返回页面尺寸、坐标变换和输出文件路径。
-
-详见 `docs/NATIVE_INTEGRATION.md`。
-
-## 推荐产品策略
-
-第一版建议：
+普通 DWF 渲染链（`-DZS_DWF_ENABLE_ODA_DWFTK=ON`）：
 
 ```text
-普通 DWF：缩略图只用于列表/附件识别，不用于签章定位
-DWFx：尝试 mutool/gxps 转图片和 PDF
-普通 DWF：只接受 Native 真实渲染结果；没有渲染器就返回 unsupported_dwf_rendering
-后续：如果客户强依赖普通 DWF 单文件高保真预览，再实现完整 W2D 渲染或接商业库
+DwfPackage(托管读 DWF v6 包) / OdaDwfAdapter(枚举 ePlot section -> 每页 W2D 流)
+  → W2dWhipRenderer(WHIP opcode 回调)
+  → RasterCanvas(矢量栅格化 + 2× 超采样抗锯齿)
+  → MinimalPng(输出 PNG) + transform JSON
 ```
 
+- 文字：FreeType 真字形，字体内嵌（`-DZS_DWF_WITH_FREETYPE=ON`）。
+- Group4 传真图：vendored libtiff（`-DZS_DWF_WITH_TIFF=ON`）。
+- 扩展图元：在 `src/w2d/W2dWhipRenderer.cpp` 加 `WT_*` 回调 + `RasterCanvas` 绘制原语，详见 `docs/W2D_RENDERING.md`。
+
+## 进程外渲染隔离（产品化）
+
+签署/批处理场景下，坏 DWF 或 native 故障不能拖垮宿主：
+
+```csharp
+var renderer = new ProcessNativeDwfRenderer();      // 找 zs_dwf_worker（同目录或 ZS_DWF_WORKER）
+var converter = new DwfxExternalConverter(nativeRenderer: renderer);
+var toolkit = new ZsDwfToolkit(converter: converter);
+// worker 崩溃 → native_render_failed；卡死 → 超时杀进程；宿主进程始终存活
+```
+
+## 容器
+
+```bash
+docker build -t zs-dwftoolkit .
+docker run --rm -v "$PWD:/data" zs-dwftoolkit to-images /data/drawing.dwf --out-dir /data/out --native
+```
 
 ## ODA 修改版 DWF Toolkit
 
