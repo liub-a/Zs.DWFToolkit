@@ -18,13 +18,16 @@ public:
 
     bool ready() const { return _ready; }
 
-    // Draws `utf8` text with its baseline starting at pixel (pen_x, pen_y), at the
-    // given pixel height, in `color`. Returns false if rendering was not possible.
+    // Draws Unicode text (UTF-16 code units) with its baseline starting at pixel
+    // (pen_x, pen_y), at the given pixel height, rotated by rotation_deg (CCW),
+    // in `color`. Returns false if rendering was not possible.
     bool draw(zs::dwf::native_render::RasterCanvas& canvas,
-              const std::string& utf8,
+              const unsigned short* codepoints,
+              int count,
               int pen_x,
               int pen_y,
               int pixel_height,
+              double rotation_deg,
               zs::dwf::native_render::Rgba color);
 
 private:

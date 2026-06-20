@@ -348,13 +348,19 @@ namespace
             int px_height = static_cast<int>(std::llround(font_units * c->canvas->scale()));
             if (px_height < 6) px_height = 12;
 
+            // Unicode (UTF-16) string + font rotation (360/65536ths of a degree).
+            const WT_Unsigned_Integer16* cps = item.string().unicode();
+            const int n = item.string().length();
+            const double rotation_deg =
+                file.rendition().font().rotation().rotation() * 360.0 / 65536.0;
+
             bool drawn = false;
-            if (c->text && c->text->ready() && item.string().ascii())
+            if (c->text && c->text->ready() && cps && n > 0)
             {
-                drawn = c->text->draw(*c->canvas, item.string().ascii(),
+                drawn = c->text->draw(*c->canvas, cps, n,
                                       static_cast<int>(std::llround(pen.x)),
                                       static_cast<int>(std::llround(pen.y)),
-                                      px_height, color);
+                                      px_height, rotation_deg, color);
             }
             if (!drawn)
                 c->canvas->draw_text_marker(p, glyphs, color, current_thickness(file, c->canvas));

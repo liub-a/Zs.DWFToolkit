@@ -1,5 +1,6 @@
 #include "TextRenderer.h"
 
+#include <cmath>
 #include <cstdlib>
 
 #ifdef ZS_DWF_WITH_FREETYPE
@@ -47,30 +48,53 @@ TextRenderer::~TextRenderer()
 #endif
 }
 
-bool TextRenderer::draw(RasterCanvas& canvas, const std::string& utf8,
-                        int pen_x, int pen_y, int pixel_height, Rgba color)
+bool TextRenderer::draw(RasterCanvas& canvas, const unsigned short* codepoints, int count,
+                        int pen_x, int pen_y, int pixel_height, double rotation_deg, Rgba color)
 {
 #ifdef ZS_DWF_WITH_FREETYPE
-    if (!_ready) return false;
+    if (!_ready || !codepoints || count <= 0) return false;
     auto face = static_cast<FT_Face>(_face);
     if (FT_Set_Pixel_Sizes(face, 0, static_cast<FT_UInt>(pixel_height > 0 ? pixel_height : 16)) != 0)
         return false;
 
-    int pen = pen_x;
-    for (unsigned char ch : utf8)
+    const double rad = rotation_deg * 3.14159265358979323846 / 180.0;
+    const bool rotated = rotation_deg != 0.0;
+    if (rotated)
     {
-        if (FT_Load_Char(face, ch, FT_LOAD_RENDER) != 0)
+        // 16.16 fixed-point rotation matrix (FreeType y axis points up).
+        FT_Matrix m;
+        m.xx = static_cast<FT_Fixed>(std::cos(rad) * 0x10000L);
+        m.xy = static_cast<FT_Fixed>(-std::sin(rad) * 0x10000L);
+        m.yx = static_cast<FT_Fixed>(std::sin(rad) * 0x10000L);
+        m.yy = static_cast<FT_Fixed>(std::cos(rad) * 0x10000L);
+        FT_Set_Transform(face, &m, nullptr);
+    }
+    else
+    {
+        FT_Set_Transform(face, nullptr, nullptr);
+    }
+
+    // Sub-pixel pen position in 26.6 advances; canvas y grows down, FT advance y up.
+    double pen_x_d = pen_x;
+    double pen_y_d = pen_y;
+    for (int i = 0; i < count; ++i)
+    {
+        if (FT_Load_Char(face, codepoints[i], FT_LOAD_RENDER) != 0)
             continue;
         const FT_GlyphSlot g = face->glyph;
         const FT_Bitmap& bm = g->bitmap;
-        canvas.blend_coverage(pen + g->bitmap_left, pen_y - g->bitmap_top,
+        canvas.blend_coverage(static_cast<int>(std::lround(pen_x_d)) + g->bitmap_left,
+                              static_cast<int>(std::lround(pen_y_d)) - g->bitmap_top,
                               bm.buffer, static_cast<int>(bm.width), static_cast<int>(bm.rows),
                               bm.pitch, color);
-        pen += static_cast<int>(g->advance.x >> 6);
+        pen_x_d += (g->advance.x / 64.0);
+        pen_y_d -= (g->advance.y / 64.0);
     }
+    if (rotated) FT_Set_Transform(face, nullptr, nullptr);
     return true;
 #else
-    (void)canvas; (void)utf8; (void)pen_x; (void)pen_y; (void)pixel_height; (void)color;
+    (void)canvas; (void)codepoints; (void)count; (void)pen_x; (void)pen_y;
+    (void)pixel_height; (void)rotation_deg; (void)color;
     return false;
 #endif
 }

@@ -75,7 +75,7 @@ The first renderer supports:
 | `WT_Polygon` | Filled and outlined |
 | `WT_Outline_Ellipse` | Drawn as ellipse outline |
 | `WT_Filled_Ellipse` | Filled ellipse |
-| `WT_Text` | Real glyphs via FreeType when built with `ZS_DWF_WITH_FREETYPE` and a system font is found; otherwise a placeholder box |
+| `WT_Text` | Real Unicode glyphs (UTF-16) with font rotation via FreeType (`ZS_DWF_WITH_FREETYPE`, embedded font); placeholder box otherwise |
 | `WT_Image` | RGB/RGBA, color-mapped/indexed, JPEG, bitonal/Group3X, and Group4X fax (vendored libtiff) all decoded to the page rect |
 | `WT_Polytriangle` | Triangle strip filled with the current color |
 | `WT_Contour_Set` | Multi-contour fill with even-odd holes |
