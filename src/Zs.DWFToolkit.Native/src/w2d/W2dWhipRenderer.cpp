@@ -562,11 +562,30 @@ namespace
             return WT_Viewport::default_process(item, file);
         }
 
-        BoxD clip;
+        // Clip to the actual contour polygon(s), not just the bounding box. Slice
+        // the flat point array into rings via the counts list (single ring if none).
         const WT_Logical_Point* pts = contour->points();
-        for (int i = 0; i < contour->total_points(); ++i)
-            clip.include(static_cast<double>(pts[i].m_x), static_cast<double>(pts[i].m_y));
-        c->canvas->set_clip(clip);
+        const WT_Integer32* counts = contour->counts();
+        std::vector<std::vector<PointD>> rings;
+        if (counts && contour->contours() > 0)
+        {
+            int idx = 0;
+            for (int ci = 0; ci < contour->contours(); ++ci)
+            {
+                std::vector<PointD> ring;
+                for (int k = 0; k < counts[ci] && idx < contour->total_points(); ++k, ++idx)
+                    ring.push_back({ static_cast<double>(pts[idx].m_x), static_cast<double>(pts[idx].m_y) });
+                rings.push_back(std::move(ring));
+            }
+        }
+        else
+        {
+            std::vector<PointD> ring;
+            for (int i = 0; i < contour->total_points(); ++i)
+                ring.push_back({ static_cast<double>(pts[i].m_x), static_cast<double>(pts[i].m_y) });
+            rings.push_back(std::move(ring));
+        }
+        c->canvas->set_clip_contours(rings);
         return WT_Viewport::default_process(item, file);
     }
 

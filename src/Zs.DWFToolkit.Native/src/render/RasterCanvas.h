@@ -95,6 +95,9 @@ public:
     // Restrict subsequent drawing to the pixels inside this logical rectangle
     // (mapped through the same transform). Used for W2D viewport/clip regions.
     void set_clip(const BoxD& logical_rect);
+    // Clips subsequent drawing to the union/even-odd region of these contours
+    // (non-rectangular viewport clip). Pixels outside are masked out.
+    void set_clip_contours(const std::vector<std::vector<PointD>>& contours);
     void clear_clip();
 
 private:
@@ -108,10 +111,11 @@ private:
     double _offset_x{0};
     double _offset_y{0};
     bool _has_clip{false};
-    int _clip_x0{0};
-    int _clip_y0{0};
-    int _clip_x1{0};
-    int _clip_y1{0};
+    std::vector<std::uint8_t> _clip_mask; // width*height, 1 = inside clip
+    bool in_clip(int x, int y) const
+    {
+        return !_has_clip || _clip_mask[static_cast<std::size_t>(y) * static_cast<std::size_t>(_width) + static_cast<std::size_t>(x)] != 0;
+    }
     std::vector<Rgba> _pixels;
 };
 

@@ -97,6 +97,21 @@ int main()
         expect(is_color(pixel_at(c, 10, 50), 255, 0, 0), "clear_clip restores full-canvas drawing");
     }
 
+    // Non-rectangular clip: a triangle clip lets the centroid through but masks a
+    // corner that a bounding-box clip would have allowed.
+    {
+        RasterCanvas c(100, 100, unit_box());
+        std::vector<std::vector<PointD>> tri = { {{10, 10}, {90, 10}, {10, 90}} }; // lower-left triangle
+        c.set_clip_contours(tri);
+        // fill the whole canvas; only the triangle region should take paint.
+        std::vector<PointD> big = {{0, 0}, {100, 0}, {100, 100}, {0, 100}};
+        c.fill_polygon(big, blue);
+        // logical (25,25) -> pixel (25,75): inside the triangle.
+        expect(is_color(pixel_at(c, 25, 75), 0, 0, 255), "inside triangle clip is painted");
+        // logical (80,80) -> pixel (80,20): outside triangle but inside its bbox.
+        expect(is_color(pixel_at(c, 80, 20), 255, 255, 255), "corner outside triangle (but inside bbox) is masked");
+    }
+
     // A dashed polyline paints "on" runs and leaves "off" gaps white.
     {
         RasterCanvas c(100, 100, unit_box());

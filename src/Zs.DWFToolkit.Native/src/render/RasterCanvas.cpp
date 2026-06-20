@@ -50,7 +50,7 @@ void RasterCanvas::set_pixel(int x, int y, Rgba color)
 {
     if (x < 0 || y < 0 || x >= _width || y >= _height)
         return;
-    if (_has_clip && (x < _clip_x0 || y < _clip_y0 || x > _clip_x1 || y > _clip_y1))
+    if (!in_clip(x, y))
         return;
     _pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(_width) + static_cast<std::size_t>(x)] = color;
 }
@@ -62,18 +62,62 @@ void RasterCanvas::set_clip(const BoxD& logical_rect)
         clear_clip();
         return;
     }
-    const auto a = to_pixel({ logical_rect.min_x, logical_rect.max_y });
-    const auto b = to_pixel({ logical_rect.max_x, logical_rect.min_y });
-    _clip_x0 = clamp_int(static_cast<int>(std::floor(std::min(a.x, b.x))), 0, _width - 1);
-    _clip_x1 = clamp_int(static_cast<int>(std::ceil(std::max(a.x, b.x))), 0, _width - 1);
-    _clip_y0 = clamp_int(static_cast<int>(std::floor(std::min(a.y, b.y))), 0, _height - 1);
-    _clip_y1 = clamp_int(static_cast<int>(std::ceil(std::max(a.y, b.y))), 0, _height - 1);
+    set_clip_contours({ {
+        { logical_rect.min_x, logical_rect.min_y },
+        { logical_rect.max_x, logical_rect.min_y },
+        { logical_rect.max_x, logical_rect.max_y },
+        { logical_rect.min_x, logical_rect.max_y },
+    } });
+}
+
+void RasterCanvas::set_clip_contours(const std::vector<std::vector<PointD>>& contours)
+{
+    // Rasterize the contour set (even-odd) into a 1-bit mask in pixel space.
+    std::vector<std::vector<PointD>> px;
+    px.reserve(contours.size());
+    for (const auto& c : contours)
+    {
+        if (c.size() < 3) continue;
+        std::vector<PointD> p;
+        p.reserve(c.size());
+        for (auto v : c) p.push_back(to_pixel(v));
+        px.push_back(std::move(p));
+    }
+    if (px.empty()) { clear_clip(); return; }
+
+    _clip_mask.assign(static_cast<std::size_t>(_width) * static_cast<std::size_t>(_height), 0);
     _has_clip = true;
+
+    std::vector<double> nodes;
+    for (int y = 0; y < _height; ++y)
+    {
+        nodes.clear();
+        const double scan_y = static_cast<double>(y) + 0.5;
+        for (const auto& p : px)
+        {
+            for (std::size_t i = 0, j = p.size() - 1; i < p.size(); j = i++)
+            {
+                const auto& pi = p[i];
+                const auto& pj = p[j];
+                if ((pi.y < scan_y && pj.y >= scan_y) || (pj.y < scan_y && pi.y >= scan_y))
+                    nodes.push_back(pi.x + (scan_y - pi.y) / (pj.y - pi.y) * (pj.x - pi.x));
+            }
+        }
+        std::sort(nodes.begin(), nodes.end());
+        for (std::size_t k = 0; k + 1 < nodes.size(); k += 2)
+        {
+            const int xs = clamp_int(static_cast<int>(std::ceil(nodes[k])), 0, _width - 1);
+            const int xe = clamp_int(static_cast<int>(std::floor(nodes[k + 1])), 0, _width - 1);
+            auto* row = _clip_mask.data() + static_cast<std::size_t>(y) * static_cast<std::size_t>(_width);
+            for (int x = xs; x <= xe; ++x) row[x] = 1;
+        }
+    }
 }
 
 void RasterCanvas::clear_clip()
 {
     _has_clip = false;
+    _clip_mask.clear();
 }
 
 void RasterCanvas::draw_disc(int cx, int cy, int radius, Rgba color)
@@ -404,7 +448,7 @@ void RasterCanvas::blend_coverage(int dst_x, int dst_y, const std::uint8_t* cove
             if (x < 0 || x >= _width) continue;
             const int a = row[gx];
             if (a == 0) continue;
-            if (_has_clip && (x < _clip_x0 || y < _clip_y0 || x > _clip_x1 || y > _clip_y1)) continue;
+            if (!in_clip(x, y)) continue;
             auto& px = _pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(_width) + static_cast<std::size_t>(x)];
             const int ia = 255 - a;
             px.r = static_cast<std::uint8_t>((color.r * a + px.r * ia) / 255);
