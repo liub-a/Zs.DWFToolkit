@@ -15,7 +15,26 @@ API 方法细节见 [API.md](API.md)；渲染能力边界见 [W2D_RENDERING.md](
 
 ## 2. 引用托管库
 
-项目引用（源码集成）：
+### NuGet 包（推荐）
+
+打包（先按 §3 构建好 native 到 `artifacts/native/<rid>/`，再 pack）：
+
+```bash
+dotnet pack src/Zs.DWFToolkit/Zs.DWFToolkit.csproj -c Release -o artifacts/nuget
+```
+
+包内含托管 `lib/net8.0/` + 各平台 native `runtimes/<rid>/native/`（`libzs_dwf_toolkit_native.*`
++ `zs_dwf_worker`）。消费方引用即自动按运行平台解析 native：
+
+```bash
+dotnet add package Zs.DWFToolkit --source path/to/artifacts/nuget
+```
+
+P/Invoke 与进程外 worker 都会从 `runtimes/<rid>/native/` 自动定位（`ProcessNativeDwfRenderer`
+也会探测该路径）。打包前需把目标平台的 native 产物放进 `artifacts/native/<rid>/`
+（`linux-x64` / `osx-arm64` / `osx-x64` / `win-x64`）；未构建的平台会被跳过。
+
+### 项目引用（源码集成）
 
 ```xml
 <ProjectReference Include="path/to/src/Zs.DWFToolkit/Zs.DWFToolkit.csproj" />

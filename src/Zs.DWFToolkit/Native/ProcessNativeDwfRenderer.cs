@@ -145,7 +145,13 @@ public sealed class ProcessNativeDwfRenderer : INativeDwfRenderer
 
         var exe = OperatingSystem.IsWindows() ? "zs_dwf_worker.exe" : "zs_dwf_worker";
         var baseDir = AppContext.BaseDirectory;
-        var candidate = Path.Combine(baseDir, exe);
-        return File.Exists(candidate) ? candidate : null;
+
+        // App output root, then the NuGet native layout (runtimes/<rid>/native/).
+        var candidates = new[]
+        {
+            Path.Combine(baseDir, exe),
+            Path.Combine(baseDir, "runtimes", System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier, "native", exe),
+        };
+        return candidates.FirstOrDefault(File.Exists);
     }
 }
