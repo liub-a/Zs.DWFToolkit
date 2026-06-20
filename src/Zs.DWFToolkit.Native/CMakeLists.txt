@@ -30,6 +30,14 @@ target_include_directories(zs_dwf_toolkit_native PRIVATE
 
 target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_TOOLKIT_NATIVE_EXPORTS)
 
+# Out-of-process render worker: the managed library invokes this with a timeout so
+# a native crash/hang is isolated from the host. Built alongside the shared library.
+option(ZS_DWF_BUILD_WORKER "Build the zs_dwf_worker out-of-process render executable" ON)
+if(ZS_DWF_BUILD_WORKER)
+    add_executable(zs_dwf_worker tools/zs_dwf_worker.cpp)
+    target_link_libraries(zs_dwf_worker PRIVATE zs_dwf_toolkit_native)
+endif()
+
 if(ZS_DWF_WITH_FREETYPE)
     # Self-contained text rendering: FreeType source is vendored in-tree
     # (third_party/freetype, v2.13.3) and built with no external deps, so the build
