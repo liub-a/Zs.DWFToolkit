@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<!--
+  Browser demo for the Rust/WASM W2D renderer spike.
+  Build first:  wasm-pack build --release --target web --out-dir pkg
+  Serve:        python3 -m http.server   (from this demo/ dir's parent so ../pkg resolves)
+  Open and pick an ASCII .w2d (e.g. tests/data/ocean_90.w2d).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Zs.DWFToolkit — W2D in the browser (Rust/WASM)</title>
+  <style>
+    body { font: 14px system-ui; margin: 1rem; }
+    canvas { border: 1px solid #ccc; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>W2D → canvas (Rust/WASM, no server, no ODA)</h1>
+  <input type="file" id="file" accept=".w2d" />
+  <div><canvas id="cv" width="1000" height="800"></canvas></div>
+
+  <script type="module">
+    import init, { render_w2d } from "../pkg/zs_dwf_wasm.js";
+    await init();
+
+    const cv = document.getElementById("cv");
+    const ctx = cv.getContext("2d");
+
+    document.getElementById("file").addEventListener("change", async (e) => {
+      const buf = new Uint8Array(await e.target.files[0].arrayBuffer());
+      const rgba = render_w2d(buf, cv.width, cv.height);          // Uint8Array RGBA
+      const img = new ImageData(new Uint8ClampedArray(rgba), cv.width, cv.height);
+      ctx.putImageData(img, 0, 0);
+    });
+  </script>
+</body>
+</html>
