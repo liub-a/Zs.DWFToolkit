@@ -11,10 +11,23 @@ parse the W2D stream in Rust and rasterize to an RGBA buffer a `<canvas>` can sh
 - Ports the C++ `RasterCanvas` transform + line drawing to Rust.
 - Builds to a **~41 KB** wasm module (vs. the multi-MB C++/ODA stack).
 
-## Not yet (future, to reach parity with the native renderer)
+## Binary W2D (partial)
 
-- Binary / compressed W2D (most production files) — the bigger WHIP parser.
-- Polygon/contour fills, ellipses, text glyphs, images, clipping, AA.
+Production `.w2d` are binary. The parser now handles binary framing (`{…}`
+extended opcodes via their offset) and the **relative-coordinate point-set
+decode** (16-bit `0x10` and 32-bit `p` polylines, with the running current-point
+scheme). Proven: the sheet border of a real binary DWF page decodes and renders.
+
+**Limitation**: a full binary stream desyncs once it hits an operand-bearing
+single-byte opcode we don't model yet (set-color-binary, line weight, fills,
+ellipses, etc.), so only the leading geometry renders. Reaching parity means
+handling every operand-bearing opcode (a sizeable, mechanical port from
+`whiptk/*.cpp`). Compressed W2D is also not handled.
+
+## Not yet (future, to reach parity)
+
+- Full single-byte opcode coverage (above), polygon/contour fills, ellipses,
+  text glyphs, images, clipping, AA.
 - DWF **package** reading (zip + sections) — currently bare `.w2d` only.
 
 ## Build & test

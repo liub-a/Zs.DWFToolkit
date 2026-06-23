@@ -50,6 +50,18 @@ mod tests {
     use super::*;
 
     const OCEAN: &[u8] = include_bytes!("../../../tests/data/ocean_90.w2d");
+    const BINARY: &[u8] = include_bytes!("../../../tests/data/binary_sample.w2d");
+
+    #[test]
+    fn renders_binary_w2d_non_blank() {
+        let rgba = render_w2d_to_rgba(BINARY, 600, 400);
+        assert_eq!(rgba.len(), 600 * 400 * 4);
+        let non_white = rgba
+            .chunks_exact(4)
+            .filter(|p| !(p[0] > 245 && p[1] > 245 && p[2] > 245))
+            .count();
+        assert!(non_white > 500, "binary w2d should draw, got {non_white}");
+    }
 
     #[test]
     fn parses_many_polylines_from_ocean() {
