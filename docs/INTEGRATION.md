@@ -34,9 +34,20 @@ P/Invoke 与进程外 worker 都会从 `runtimes/<rid>/native/` 自动定位（`
 也会探测该路径）。打包前需把目标平台的 native 产物（**库 + `zs_dwf_worker`**）放进
 `artifacts/native/<rid>/`；未构建的平台会被跳过。
 
-CI 的 `native-oda` 作业已对 **`linux-x64` 和 `linux-arm64`** 构建并上传完整产物
-（库 + worker）为 `native-oda-<rid>` artifact；下载解压到 `artifacts/native/<rid>/`
-再 `dotnet pack` 即可。`osx-arm64` / `osx-x64` / `win-x64` 需在对应平台各自构建后放入。
+**一键构建（在目标平台上跑）**：
+
+```bash
+# 在该平台（如 Linux x64 / Linux arm64 机器）上执行，自动检测 RID，
+# 编出 native 库 + worker 并放到 artifacts/native/<rid>/：
+scripts/build-native-release.sh            # 仅构建+暂存
+scripts/build-native-release.sh --pack     # 顺带 dotnet pack
+ZS_RID=linux-x64 scripts/build-native-release.sh   # 手动指定 RID
+```
+
+每个目标平台各跑一次（linux-x64 / linux-arm64 / osx-arm64 / osx-x64 / win-x64），
+全部暂存后再 `dotnet pack` 一次即得全平台包。CI 的 `native-oda` 矩阵也会对
+`linux-x64` + `linux-arm64` 构建并上传 `native-oda-<rid>` artifact（库 + worker），
+下载解压到 `artifacts/native/<rid>/` 同样可 pack。
 注意：每个 RID 都要带 `zs_dwf_worker`，否则该平台只能进程内渲染（无崩溃/超时隔离）。
 
 ### 项目引用（源码集成）
