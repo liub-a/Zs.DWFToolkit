@@ -5,6 +5,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# ODA DWFToolkit assumes wchar_t is 16-bit and passes const wchar_t* to
+# WT_String::set(const WT_Unsigned_Integer16*). MSVC's default native wchar_t is a
+# distinct type, so that call fails overload resolution (C2665 in XAML/XamlText.cpp).
+# /Zc:wchar_t- makes wchar_t an alias for unsigned short, matching the toolkit's
+# assumption. Set before any target is defined so the ODA subdirectory inherits it.
+# zlib/libtiff/freetype are C, so this only affects C++ translation units.
+if(MSVC)
+  add_compile_options(/Zc:wchar_t-)
+endif()
+
 option(ZS_DWF_ENABLE_ODA_DWFTK "Build and link the bundled ODA-modified DWFToolkit-7.7 source" OFF)
 option(ZS_DWF_BUILD_TESTS "Build native RasterCanvas unit tests (CTest)" OFF)
 option(ZS_DWF_WITH_FREETYPE "Render W2D text with FreeType glyphs instead of placeholder boxes" OFF)
