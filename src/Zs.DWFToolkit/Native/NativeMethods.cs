@@ -32,6 +32,19 @@ internal static partial class NativeMethods
         StringBuilder outputJson,
         int outputJsonSize);
 
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, EntryPoint = "zs_w2d_stamp_image")]
+    internal static extern int StampW2dImage(
+        string inputW2dPath,
+        string outputW2dPath,
+        byte[] rgba,
+        int rgbaLen,
+        int imgWidth,
+        int imgHeight,
+        int minX,
+        int minY,
+        int maxX,
+        int maxY);
+
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, EntryPoint = "zs_dwf_get_last_error")]
     internal static extern IntPtr GetLastErrorPtr();
 

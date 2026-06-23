@@ -127,6 +127,13 @@ if(ZS_DWF_ENABLE_ODA_DWFTK)
         ${ZS_DWF_ODA_DWFTK_ROOT}
     )
 
+    # dwf/Toolkit.cpp defines _DWFToolkitMemory::operator new/delete but the ODA
+    # CMake does not compile it into DwfToolkit, leaving the symbol undefined in our
+    # shared library. macOS tolerates undefined symbols in a dylib; GNU ld does not,
+    # so any executable linking the .so fails. Compile it directly into our library.
+    target_sources(zs_dwf_toolkit_native PRIVATE
+        "${ZS_DWF_ODA_DWFTK_ROOT}/develop/global/src/dwf/Toolkit.cpp")
+
     # W3dTk pulls in zlib and libjpeg symbols and DwfToolkit references W3dTk, so
     # both must be built. zlib is always vendored in-tree (third_party/zlib, static).
     set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
