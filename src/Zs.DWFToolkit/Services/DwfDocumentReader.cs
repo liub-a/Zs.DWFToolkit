@@ -72,6 +72,19 @@ public sealed class DwfDocumentReader : IDwfDocumentReader
         }
     }
 
+    // Resolves a zip entry from a (possibly separator-normalized) full name; zip keys may use '\'.
+    private static ZipArchiveEntry? FindArchiveEntry(ZipArchive archive, string fullName)
+    {
+        var direct = archive.GetEntry(fullName)
+                     ?? archive.GetEntry(fullName.Replace('/', '\\'))
+                     ?? archive.GetEntry(fullName.Replace('\\', '/'));
+        if (direct != null) return direct;
+
+        var target = fullName.Replace('\\', '/');
+        return archive.Entries.FirstOrDefault(e =>
+            string.Equals(e.FullName.Replace('\\', '/'), target, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static DwfDocumentInfo Fail(string? sourcePath, string code, string message) => new()
     {
         Success = false,
@@ -142,14 +155,38 @@ public sealed class DwfDocumentReader : IDwfDocumentReader
             var w2d = entries.Where(e => e.IsPossibleW2d).ToList();
             for (var i = 0; i < w2d.Count; i++)
             {
-                pages.Add(new DwfPageInfo
+                var page = new DwfPageInfo
                 {
                     PageIndex = i,
                     PageName = Path.GetFileNameWithoutExtension(w2d[i].FullName),
                     GraphicsResourcePath = w2d[i].FullName,
                     Has2dGraphics = true,
                     Unit = "dwf_internal"
-                });
+                };
+
+                // Surface the real drawing sheet size from the W2D (PlotInfo ... mm W H ...) header
+                // so paper-size matching and stamp positioning have true millimetre dimensions.
+                // PackageEntryClassifier normalizes '\' to '/', so resolve tolerantly to the real key.
+                var zipEntry = FindArchiveEntry(archive, w2d[i].FullName);
+                if (zipEntry != null)
+                {
+                    try
+                    {
+                        using var stream = zipEntry.Open();
+                        if (W2dPlotInfo.TryReadPaperMm(stream) is { } size)
+                        {
+                            page.Width = size.WidthMm;
+                            page.Height = size.HeightMm;
+                            page.Unit = "mm";
+                        }
+                    }
+                    catch
+                    {
+                        // Non-fatal: fall back to unknown dimensions.
+                    }
+                }
+
+                pages.Add(page);
             }
         }
 

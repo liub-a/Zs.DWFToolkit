@@ -70,7 +70,10 @@ public sealed class DwfxExternalConverter : IDwfConverter
             if (!imageResult.Success || imageResult.OutputFiles.Count == 0)
                 return Unsupported(sourcePath, outputDirectory: null, imageResult.ErrorMessage);
 
-            var pdf = await CreatePdfFromImagesAsync(imageResult.OutputFiles, outputPdfPath, options, cancellationToken).ConfigureAwait(false);
+            // Size the PDF page to the true paper millimetres so the MediaBox equals the real
+            // drawing sheet (A3/A1/…); downstream stamp positioning reads page mm from this box.
+            var pdfOptions = WithPdfPageSizeFromPaper(options, info);
+            var pdf = await CreatePdfFromImagesAsync(imageResult.OutputFiles, outputPdfPath, pdfOptions, cancellationToken).ConfigureAwait(false);
             pdf.SourcePath = sourcePath;
             if (pdf.Success)
                 pdf.ErrorMessage ??= "PDF was assembled from native-rendered page images; this is raster output, not vector CAD output.";
@@ -213,8 +216,18 @@ public sealed class DwfxExternalConverter : IDwfConverter
             for (var i = 0; i < pageCount; i++)
             {
                 var outFile = Path.Combine(outputDirectory, $"page-{i + 1:000}.{imageFormat}");
-                var result = await _nativeRenderer.RenderPageAsync(sourcePath, i, outFile, options, cancellationToken).ConfigureAwait(false);
-                if (result.Success && File.Exists(outFile)) outputFiles.Add(outFile);
+                var page = info.Success && i < info.Pages.Count ? info.Pages[i] : null;
+                // Render at the real paper aspect (px = mm/25.4 × dpi) so the drawing is not stretched
+                // into the legacy fixed 2400×1600 canvas.
+                var pageOptions = WithPixelSizeFromPaper(options, page);
+                var result = await _nativeRenderer.RenderPageAsync(sourcePath, i, outFile, pageOptions, cancellationToken).ConfigureAwait(false);
+                if (result.Success && File.Exists(outFile))
+                {
+                    // Tag the PNG density with the render DPI so image-to-PDF assembly sizes the page
+                    // to the real paper millimetres (px were computed as mm/25.4 × dpi above).
+                    if (HasPaperMm(page)) PngDensity.TrySetDpi(outFile, pageOptions.Dpi);
+                    outputFiles.Add(outFile);
+                }
             }
 
             if (outputFiles.Count > 0)
@@ -236,6 +249,23 @@ public sealed class DwfxExternalConverter : IDwfConverter
 
     private async Task<DwfRenderResult> CreatePdfFromImagesAsync(IReadOnlyList<string> imageFiles, string outputPdfPath, DwfRenderOptions options, CancellationToken cancellationToken)
     {
+        // When the true paper size is known we must control the MediaBox exactly; mutool sizes the
+        // page from the image's own DPI metadata and cannot guarantee millimetre-accurate pages, so
+        // the simple writer (which honours PdfPageWidth/HeightPoints) takes precedence here.
+        var exactPage = options.PdfPageWidthPoints.HasValue && options.PdfPageHeightPoints.HasValue;
+        if (exactPage && SimpleImagePdfWriter.TryWrite(imageFiles, outputPdfPath, options, out var exactMessage))
+        {
+            return new DwfRenderResult
+            {
+                Success = true,
+                ErrorCode = DwfErrorCodes.Ok,
+                OutputPath = outputPdfPath,
+                OutputFiles = new List<string> { outputPdfPath },
+                ToolName = "simple-image-pdf-writer",
+                ErrorMessage = exactMessage
+            };
+        }
+
         var mutool = ProcessRunner.FindExecutable(options.MutoolPath, "mutool");
         if (mutool != null)
         {
@@ -356,4 +386,72 @@ public sealed class DwfxExternalConverter : IDwfConverter
             .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    private const double PointsPerMm = 72.0 / 25.4;
+
+    /// <summary>True only when the page carries real millimetre dimensions parsed from W2D PlotInfo.</summary>
+    private static bool HasPaperMm(DwfPageInfo? page) => TryGetPaperMm(page, out _, out _);
+
+    /// <summary>Extracts real paper millimetres from a page, when present.</summary>
+    private static bool TryGetPaperMm(DwfPageInfo? page, out double widthMm, out double heightMm)
+    {
+        widthMm = 0;
+        heightMm = 0;
+        if (page is not { Width: > 0, Height: > 0 } ||
+            !string.Equals(page.Unit, "mm", StringComparison.OrdinalIgnoreCase))
+            return false;
+        widthMm = page.Width.Value;
+        heightMm = page.Height.Value;
+        return true;
+    }
+
+    /// <summary>Returns options whose render pixels follow the real paper aspect (mm/25.4 × dpi); no-op if already sized or no paper info.</summary>
+    private static DwfRenderOptions WithPixelSizeFromPaper(DwfRenderOptions options, DwfPageInfo? page)
+    {
+        if (options.WidthPx.HasValue && options.HeightPx.HasValue) return options;
+        if (!TryGetPaperMm(page, out var widthMm, out var heightMm)) return options;
+
+        var widthPx = (int)Math.Round(widthMm / 25.4 * options.Dpi);
+        var heightPx = (int)Math.Round(heightMm / 25.4 * options.Dpi);
+        if (widthPx <= 0 || heightPx <= 0) return options;
+
+        var clone = Clone(options);
+        clone.WidthPx = options.WidthPx ?? widthPx;
+        clone.HeightPx = options.HeightPx ?? heightPx;
+        return clone;
+    }
+
+    /// <summary>Returns options whose PDF page points equal the first page's real paper millimetres; no-op if already fixed or no paper info.</summary>
+    private static DwfRenderOptions WithPdfPageSizeFromPaper(DwfRenderOptions options, DwfDocumentInfo info)
+    {
+        if (options.PdfPageWidthPoints.HasValue && options.PdfPageHeightPoints.HasValue) return options;
+        var page = info.Success && info.Pages.Count > 0 ? info.Pages[0] : null;
+        if (!TryGetPaperMm(page, out var widthMm, out var heightMm)) return options;
+
+        var clone = Clone(options);
+        clone.PdfPageWidthPoints = options.PdfPageWidthPoints ?? widthMm * PointsPerMm;
+        clone.PdfPageHeightPoints = options.PdfPageHeightPoints ?? heightMm * PointsPerMm;
+        return clone;
+    }
+
+    private static DwfRenderOptions Clone(DwfRenderOptions o) => new()
+    {
+        Dpi = o.Dpi,
+        WidthPx = o.WidthPx,
+        HeightPx = o.HeightPx,
+        ImageFormat = o.ImageFormat,
+        JpegQuality = o.JpegQuality,
+        Timeout = o.Timeout,
+        MutoolPath = o.MutoolPath,
+        GhostXpsPath = o.GhostXpsPath,
+        PreferNativeDwfRenderer = o.PreferNativeDwfRenderer,
+        RasterImageMinBytes = o.RasterImageMinBytes,
+        SkipThumbnailWhenRasterImagesExist = o.SkipThumbnailWhenRasterImagesExist,
+        CreatePdfFromImagesFallback = o.CreatePdfFromImagesFallback,
+        PdfPageWidthPoints = o.PdfPageWidthPoints,
+        PdfPageHeightPoints = o.PdfPageHeightPoints,
+        PdfMarginPoints = o.PdfMarginPoints,
+        KeepTemporaryFiles = o.KeepTemporaryFiles,
+        Overwrite = o.Overwrite
+    };
 }
