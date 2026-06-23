@@ -172,23 +172,24 @@ if(ZS_DWF_ENABLE_ODA_DWFTK)
     # against prebuilt DwfToolkit/DwfCore binaries instead.
     add_subdirectory("${ZS_DWF_ODA_DWFTK_ROOT}" "${CMAKE_BINARY_DIR}/DWFToolkit-7.7")
 
-    if(TARGET DwfToolkit)
-        target_link_libraries(zs_dwf_toolkit_native PRIVATE DwfToolkit)
-    endif()
-    if(TARGET DwfCore)
-        target_link_libraries(zs_dwf_toolkit_native PRIVATE DwfCore)
-    endif()
-    if(TARGET WhipTk)
-        target_link_libraries(zs_dwf_toolkit_native PRIVATE WhipTk)
-    endif()
-    # W3dTk (3D/eModel toolkit) is required because DwfToolkit references its
-    # opcode-handler symbols, even though this library only renders 2D W2D content.
-    if(TARGET W3dTk)
-        target_link_libraries(zs_dwf_toolkit_native PRIVATE W3dTk)
-    endif()
+    # The ODA static libs (DwfToolkit/DwfCore/WhipTk/W3dTk) reference each other
+    # circularly. Apple's linker resolves that automatically, but GNU ld (Linux)
+    # processes static libs in order and drops not-yet-referenced objects, leaving
+    # undefined symbols (e.g. DWFCore::AtomicIncrement, _DWFToolkitMemory::operator
+    # delete) in the shared library. Wrap them in a --start-group so ld rescans.
+    set(_oda_libs "")
+    foreach(_t DwfToolkit DwfCore WhipTk W3dTk)
+        if(TARGET ${_t})
+            list(APPEND _oda_libs ${_t})
+        endif()
+    endforeach()
 
-    # Link the vendored static zlib + libjpeg (W3dTk pulls in their symbols).
-    target_link_libraries(zs_dwf_toolkit_native PRIVATE ${ZS_JPEG_LIB} zlibstatic)
+    if(APPLE OR MSVC)
+        target_link_libraries(zs_dwf_toolkit_native PRIVATE ${_oda_libs} ${ZS_JPEG_LIB} zlibstatic)
+    else()
+        target_link_libraries(zs_dwf_toolkit_native PRIVATE
+            -Wl,--start-group ${_oda_libs} ${ZS_JPEG_LIB} zlibstatic -Wl,--end-group)
+    endif()
 endif()
 
 if(ZS_DWF_BUILD_TESTS)

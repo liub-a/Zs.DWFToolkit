@@ -108,6 +108,38 @@ jobs:
           path: artifacts/native/${{ matrix.rid }}/
           if-no-files-found: warn
 
+  native-oda-windows:
+    name: Native build (ODA) win-x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Import ODA-modified DWF Toolkit source
+        shell: bash
+        run: ./scripts/setup-oda-dwftoolkit.sh
+
+      - name: Configure + build (ODA + FreeType + TIFF + worker)
+        shell: bash
+        run: |
+          cmake -S src/Zs.DWFToolkit.Native -B build/native-oda -DZS_DWF_ENABLE_ODA_DWFTK=ON -DZS_DWF_WITH_FREETYPE=ON -DZS_DWF_WITH_TIFF=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/native-oda --config Release --parallel 2
+
+      - name: Stage native artifacts (DLL + worker)
+        shell: bash
+        run: |
+          mkdir -p artifacts/native/win-x64
+          find build/native-oda -name 'zs_dwf_toolkit_native.dll' -exec cp {} artifacts/native/win-x64/ \;
+          find build/native-oda -name 'zs_dwf_worker.exe'        -exec cp {} artifacts/native/win-x64/ \;
+          ls -la artifacts/native/win-x64
+
+      - name: Upload native artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-oda-win-x64
+          path: artifacts/native/win-x64/
+          if-no-files-found: warn
+
   docker:
     name: Docker image (manual)
     # Heavy (full ODA build); run on demand rather than every push.

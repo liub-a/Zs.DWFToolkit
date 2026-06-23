@@ -64,8 +64,10 @@ echo ">> building (-j $JOBS) — each WhipTk TU needs ~GBs of RAM; raise ZS_JOBS
 cmake --build "$BUILD" --config Release -j "$JOBS" \
   --target zs_dwf_toolkit_native zs_dwf_worker
 
-# --- stage artifacts -----------------------------------------------------------
-OUT="$ROOT/artifacts/native/$RID"
+# --- stage artifacts into the committed prebuilt dir ---------------------------
+# native-prebuilt/<rid>/ is checked in and used by `dotnet pack`. Re-run this only
+# when the native code changes, then commit the updated binaries.
+OUT="$ROOT/native-prebuilt/$RID"
 mkdir -p "$OUT"
 LIB_PATH="$(find "$BUILD" -name "$LIB" | head -1)"
 WORKER_PATH="$(find "$BUILD" -name "$WORKER" | head -1)"
