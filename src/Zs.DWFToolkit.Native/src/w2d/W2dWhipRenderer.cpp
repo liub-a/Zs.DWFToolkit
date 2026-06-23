@@ -15,6 +15,12 @@
 #include "../image/Group4Decoder.h"
 #include <csetjmp>
 #include <cstdio>
+#ifdef _WIN32
+// whiptk headers pull in <windows.h>, which already defines INT32 (basetsd.h).
+// Define XMD_H so libjpeg's jmorecfg.h skips its own `typedef long INT32`,
+// avoiding C2371 "INT32: redefinition; different basic types".
+#define XMD_H
+#endif
 extern "C" {
 #include <jpeglib.h>
 }

@@ -19,6 +19,9 @@ if(MSVC)
   # which reject wchar_t* (C2664). Define UNICODE/_UNICODE so they bind to the wide
   # variants, matching the toolkit's standard Windows configuration.
   add_compile_definitions(UNICODE _UNICODE)
+  # whiptk headers include <windows.h>, whose min/max macros break
+  # std::numeric_limits<T>::max() and std::max/std::min (C2589). Suppress them.
+  add_compile_definitions(NOMINMAX)
 endif()
 
 option(ZS_DWF_ENABLE_ODA_DWFTK "Build and link the bundled ODA-modified DWFToolkit-7.7 source" OFF)
