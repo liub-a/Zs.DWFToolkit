@@ -65,13 +65,18 @@ jobs:
           if-no-files-found: warn
 
   native-oda:
-    name: Native build (ODA W2D renderer)
-    runs-on: ubuntu-latest
+    name: Native build (ODA) ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest,    rid: linux-x64 }
+          - { runner: ubuntu-24.04-arm, rid: linux-arm64 }
     steps:
       - uses: actions/checkout@v4
 
       - name: Install build tools
-        # W3dTk needs libjpeg + zlib; verified to build+link locally on macOS.
         # All third-party libs (FreeType, libtiff, zlib, libjpeg) are vendored and
         # built from source; only a C/C++ toolchain is needed.
         run: sudo apt-get update && sudo apt-get install -y cmake g++ unzip
@@ -79,7 +84,7 @@ jobs:
       - name: Import ODA-modified DWF Toolkit source
         run: ./scripts/setup-oda-dwftoolkit.sh
 
-      - name: Configure + build (ODA + FreeType + tests)
+      - name: Configure + build (ODA + FreeType + TIFF + worker + tests)
         run: |
           cmake -S src/Zs.DWFToolkit.Native -B build/native-oda -DZS_DWF_ENABLE_ODA_DWFTK=ON -DZS_DWF_WITH_FREETYPE=ON -DZS_DWF_WITH_TIFF=ON -DZS_DWF_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
           # Bounded parallelism: each WhipTk TU needs ~GBs; -j unbounded OOM-kills the runner.
@@ -89,12 +94,18 @@ jobs:
         # Regression samples are committed under tests/data, so no download is needed.
         run: ctest --test-dir build/native-oda --output-on-failure
 
-      - name: Upload library
+      - name: Stage native artifacts (library + worker)
+        run: |
+          mkdir -p artifacts/native/${{ matrix.rid }}
+          cp build/native-oda/libzs_dwf_toolkit_native.so artifacts/native/${{ matrix.rid }}/
+          cp build/native-oda/zs_dwf_worker              artifacts/native/${{ matrix.rid }}/
+
+      - name: Upload native artifacts
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: native-oda-linux-x64
-          path: build/native-oda/libzs_dwf_toolkit_native.so
+          name: native-oda-${{ matrix.rid }}
+          path: artifacts/native/${{ matrix.rid }}/
           if-no-files-found: warn
 
   docker:

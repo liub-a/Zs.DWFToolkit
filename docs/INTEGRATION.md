@@ -31,8 +31,13 @@ dotnet add package Zs.DWFToolkit --source path/to/artifacts/nuget
 ```
 
 P/Invoke 与进程外 worker 都会从 `runtimes/<rid>/native/` 自动定位（`ProcessNativeDwfRenderer`
-也会探测该路径）。打包前需把目标平台的 native 产物放进 `artifacts/native/<rid>/`
-（`linux-x64` / `osx-arm64` / `osx-x64` / `win-x64`）；未构建的平台会被跳过。
+也会探测该路径）。打包前需把目标平台的 native 产物（**库 + `zs_dwf_worker`**）放进
+`artifacts/native/<rid>/`；未构建的平台会被跳过。
+
+CI 的 `native-oda` 作业已对 **`linux-x64` 和 `linux-arm64`** 构建并上传完整产物
+（库 + worker）为 `native-oda-<rid>` artifact；下载解压到 `artifacts/native/<rid>/`
+再 `dotnet pack` 即可。`osx-arm64` / `osx-x64` / `win-x64` 需在对应平台各自构建后放入。
+注意：每个 RID 都要带 `zs_dwf_worker`，否则该平台只能进程内渲染（无崩溃/超时隔离）。
 
 ### 项目引用（源码集成）
 
