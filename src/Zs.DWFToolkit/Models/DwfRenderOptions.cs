@@ -19,8 +19,12 @@ public sealed class DwfRenderOptions
     public string? MutoolPath { get; set; }
     public string? GhostXpsPath { get; set; }
 
-    /// <summary>Use the native DWF renderer first for ordinary DWF files when available.</summary>
-    public bool PreferNativeDwfRenderer { get; set; } = false;
+    /// <summary>
+    /// Use the native DWF renderer for ordinary DWF files when available. Defaults to
+    /// true now that native W2D rendering is implemented; when the native renderer is
+    /// not deployed, plain-DWF conversion still returns <c>unsupported_dwf_rendering</c>.
+    /// </summary>
+    public bool PreferNativeDwfRenderer { get; set; } = true;
 
     /// <summary>
     /// Legacy diagnostic switch. Do not use embedded raster/page-preview resources as successful page rendering
