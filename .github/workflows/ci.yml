@@ -71,28 +71,37 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { runner: ubuntu-latest,    rid: linux-x64 }
-          - { runner: ubuntu-24.04-arm, rid: linux-arm64 }
+          - { runner: ubuntu-latest,    rid: linux-x64,   image: quay.io/pypa/manylinux2014_x86_64 }
+          - { runner: ubuntu-24.04-arm, rid: linux-arm64, image: quay.io/pypa/manylinux2014_aarch64 }
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build tools
-        # All third-party libs (FreeType, libtiff, zlib, libjpeg) are vendored and
-        # built from source; only a C/C++ toolchain is needed.
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ unzip
+      # Build inside a manylinux2014 (glibc 2.17) container so the resulting .so and
+      # worker load on essentially any modern Linux. glibc is backward- but not
+      # forward-compatible: a binary built on ubuntu-24.04 (glibc 2.38) refuses to
+      # load on older servers. We do NOT use job-level `container:` because GitHub
+      # actions (checkout's node20) require glibc 2.28; instead checkout runs on the
+      # host and only the compile/test runs in the old-glibc container via docker run.
 
       - name: Import ODA-modified DWF Toolkit source
-        run: ./scripts/setup-oda-dwftoolkit.sh
-
-      - name: Configure + build (ODA + FreeType + TIFF + worker + tests)
+        # Runs on the host (has tar/xz); extracts the vendored toolkit into the
+        # workspace, which is then bind-mounted into the build container.
         run: |
-          cmake -S src/Zs.DWFToolkit.Native -B build/native-oda -DZS_DWF_ENABLE_ODA_DWFTK=ON -DZS_DWF_WITH_FREETYPE=ON -DZS_DWF_WITH_TIFF=ON -DZS_DWF_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
-          # Bounded parallelism: each WhipTk TU needs ~GBs; -j unbounded OOM-kills the runner.
-          cmake --build build/native-oda --config Release -j 2
+          sudo apt-get update && sudo apt-get install -y unzip
+          ./scripts/setup-oda-dwftoolkit.sh
 
-      - name: Run native tests (unit + W2D round-trip + ocean/DWF regression + Group4)
-        # Regression samples are committed under tests/data, so no download is needed.
-        run: ctest --test-dir build/native-oda --output-on-failure
+      - name: Configure + build + test in manylinux2014 (glibc 2.17)
+        run: |
+          docker run --rm -v "$PWD":/src -w /src ${{ matrix.image }} bash -c '
+            set -euo pipefail
+            cmake -S src/Zs.DWFToolkit.Native -B build/native-oda \
+              -DZS_DWF_ENABLE_ODA_DWFTK=ON -DZS_DWF_WITH_FREETYPE=ON -DZS_DWF_WITH_TIFF=ON \
+              -DZS_DWF_BUILD_TESTS=ON -DZS_DWF_PREFER_SYSTEM_JPEG=OFF -DCMAKE_BUILD_TYPE=Release
+            # Bounded parallelism: each WhipTk TU needs ~GBs; -j unbounded OOM-kills the runner.
+            cmake --build build/native-oda --config Release -j 2
+            # Regression samples are committed under tests/data, so no download is needed.
+            ctest --test-dir build/native-oda --output-on-failure
+          '
 
       - name: Stage native artifacts (library + worker)
         run: |
