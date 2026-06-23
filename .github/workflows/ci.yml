@@ -149,6 +149,42 @@ jobs:
           path: artifacts/native/win-x64/
           if-no-files-found: warn
 
+  native-oda-macos:
+    name: Native build (ODA) osx-x64
+    # macos-13 is the Intel (x86_64) runner; macos-14+ are arm64. This job produces
+    # the osx-x64 dylib. The osx-arm64 binary is built/committed from a local Mac.
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Import ODA-modified DWF Toolkit source
+        run: ./scripts/setup-oda-dwftoolkit.sh
+
+      - name: Configure + build (ODA + FreeType + TIFF + worker)
+        run: |
+          # Bundle libjpeg (PREFER_SYSTEM_JPEG=OFF) so the dylib has no Homebrew
+          # runtime dependency, and target an older macOS for broad compatibility.
+          cmake -S src/Zs.DWFToolkit.Native -B build/native-oda \
+            -DZS_DWF_ENABLE_ODA_DWFTK=ON -DZS_DWF_WITH_FREETYPE=ON -DZS_DWF_WITH_TIFF=ON \
+            -DZS_DWF_PREFER_SYSTEM_JPEG=OFF -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/native-oda --config Release --parallel 2
+
+      - name: Stage native artifacts (dylib + worker)
+        run: |
+          mkdir -p artifacts/native/osx-x64
+          cp build/native-oda/libzs_dwf_toolkit_native.dylib artifacts/native/osx-x64/
+          cp build/native-oda/zs_dwf_worker                  artifacts/native/osx-x64/
+          ls -la artifacts/native/osx-x64
+
+      - name: Upload native artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-oda-osx-x64
+          path: artifacts/native/osx-x64/
+          if-no-files-found: warn
+
   docker:
     name: Docker image (manual)
     # Heavy (full ODA build); run on demand rather than every push.
