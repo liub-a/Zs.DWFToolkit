@@ -62,6 +62,12 @@ target_include_directories(zs_dwf_toolkit_native PRIVATE
 target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_TOOLKIT_NATIVE_EXPORTS)
 zs_dwf_apply_our_msvc_defs(zs_dwf_toolkit_native)
 
+# ODA DWFCore uses pthreads. On glibc < 2.34 (e.g. the manylinux2014/glibc-2.17
+# build container) pthread is a separate library and must be linked explicitly;
+# newer glibc folds it into libc. Threads::Threads does the right thing everywhere.
+find_package(Threads REQUIRED)
+target_link_libraries(zs_dwf_toolkit_native PRIVATE Threads::Threads)
+
 # Out-of-process render worker: the managed library invokes this with a timeout so
 # a native crash/hang is isolated from the host. Built alongside the shared library.
 option(ZS_DWF_BUILD_WORKER "Build the zs_dwf_worker out-of-process render executable" ON)
@@ -280,6 +286,7 @@ if(ZS_DWF_BUILD_TESTS)
         if(MSVC)
             target_link_libraries(w2d_roundtrip_tests PRIVATE rpcrt4)
         endif()
+        target_link_libraries(w2d_roundtrip_tests PRIVATE Threads::Threads)
         add_test(NAME w2d_roundtrip_tests COMMAND w2d_roundtrip_tests)
 
         # Regression against the public ocean_90.w2d sample (path via ZS_DWF_OCEAN_W2D;
