@@ -56,6 +56,21 @@ ZS_DWF_API int zs_w2d_render_file(
     char* output_json,
     int output_json_size);
 
+// Stamps an RGBA image onto a W2D stream (copies all opcodes, appends a WT_Image
+// at the logical rectangle). rgba is row-major img_w*img_h*4 bytes. Returns
+// ZS_DWF_OK on success. Requires the ODA build.
+ZS_DWF_API int zs_w2d_stamp_image(
+    const char* input_w2d_path,
+    const char* output_w2d_path,
+    const unsigned char* rgba,
+    int rgba_len,
+    int img_w,
+    int img_h,
+    int min_x,
+    int min_y,
+    int max_x,
+    int max_y);
+
 ZS_DWF_API const char* zs_dwf_get_last_error();
 
 #ifdef __cplusplus

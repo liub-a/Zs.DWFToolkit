@@ -16,6 +16,7 @@ add_library(zs_dwf_toolkit_native SHARED
     src/render/RasterCanvas.cpp
     src/text/TextRenderer.cpp
     src/image/Group4Decoder.cpp
+    src/edit/W2dStamp.cpp
     src/w2d/W2dWhipRenderer.cpp
     src/dwf/OdaDwfAdapter.cpp
 )
@@ -214,17 +215,22 @@ if(ZS_DWF_BUILD_TESTS)
             ${ZS_DWF_ODA_DWFTK_ROOT}/develop/global/src
             ${ZS_DWF_ODA_DWFTK_ROOT}/develop/global/src/dwf
         )
+        # This test writes a W2D itself, so it links the ODA static libs directly.
+        # Include DwfToolkit (_DWFToolkitMemory) and wrap the circular set in a
+        # --start-group on GNU ld (same reason as the shared library above).
         target_link_libraries(w2d_roundtrip_tests PRIVATE zs_dwf_toolkit_native)
-        if(TARGET WhipTk)
-            target_link_libraries(w2d_roundtrip_tests PRIVATE WhipTk)
+        set(_oda_test_libs "")
+        foreach(_t DwfToolkit DwfCore WhipTk W3dTk)
+            if(TARGET ${_t})
+                list(APPEND _oda_test_libs ${_t})
+            endif()
+        endforeach()
+        if(APPLE OR MSVC)
+            target_link_libraries(w2d_roundtrip_tests PRIVATE ${_oda_test_libs} ${ZS_JPEG_LIB} zlibstatic)
+        else()
+            target_link_libraries(w2d_roundtrip_tests PRIVATE
+                -Wl,--start-group ${_oda_test_libs} ${ZS_JPEG_LIB} zlibstatic -Wl,--end-group)
         endif()
-        if(TARGET DwfCore)
-            target_link_libraries(w2d_roundtrip_tests PRIVATE DwfCore)
-        endif()
-        if(TARGET W3dTk)
-            target_link_libraries(w2d_roundtrip_tests PRIVATE W3dTk)
-        endif()
-        target_link_libraries(w2d_roundtrip_tests PRIVATE ${ZS_JPEG_LIB} zlibstatic)
         add_test(NAME w2d_roundtrip_tests COMMAND w2d_roundtrip_tests)
 
         # Regression against the public ocean_90.w2d sample (path via ZS_DWF_OCEAN_W2D;

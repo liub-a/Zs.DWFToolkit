@@ -61,6 +61,23 @@ int main(int argc, char** argv)
                                 std::atoi(argv[4]), std::atoi(argv[5]), std::atoi(argv[6]),
                                 json.data(), kJsonBuffer);
     }
+    else if (cmd == "stamp" && argc == 11)
+    {
+        // stamp <in.w2d> <out.w2d> <rgba_file> <w> <h> <minx> <miny> <maxx> <maxy>
+        FILE* f = std::fopen(argv[4], "rb");
+        if (!f) { std::fprintf(stderr, "cannot open rgba file\n"); return ZS_DWF_FILE_NOT_FOUND; }
+        std::fseek(f, 0, SEEK_END);
+        long n = std::ftell(f);
+        std::fseek(f, 0, SEEK_SET);
+        std::vector<unsigned char> rgba(n > 0 ? n : 0);
+        if (n > 0 && std::fread(rgba.data(), 1, n, f) != static_cast<size_t>(n)) { std::fclose(f); return ZS_DWF_INTERNAL_ERROR; }
+        std::fclose(f);
+        rc = zs_w2d_stamp_image(argv[2], argv[3], rgba.data(), static_cast<int>(rgba.size()),
+                                std::atoi(argv[5]), std::atoi(argv[6]),
+                                std::atoi(argv[7]), std::atoi(argv[8]), std::atoi(argv[9]), std::atoi(argv[10]));
+        std::fprintf(stderr, "stamp rc=%d %s\n", rc, zs_dwf_get_last_error());
+        return rc;
+    }
     else
     {
         return usage();

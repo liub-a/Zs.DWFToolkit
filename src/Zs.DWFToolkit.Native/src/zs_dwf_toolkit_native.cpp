@@ -4,6 +4,7 @@
 #include <fstream>
 #include "dwf/OdaDwfAdapter.h"
 #include "w2d/W2dWhipRenderer.h"
+#include "edit/W2dStamp.h"
 
 static thread_local std::string g_last_error;
 
@@ -163,6 +164,36 @@ extern "C" ZS_DWF_API int zs_w2d_render_file(
 
     g_last_error = result.error_message;
     return result.success ? ZS_DWF_OK : result.result_code;
+}
+
+extern "C" ZS_DWF_API int zs_w2d_stamp_image(
+    const char* input_w2d_path,
+    const char* output_w2d_path,
+    const unsigned char* rgba,
+    int rgba_len,
+    int img_w,
+    int img_h,
+    int min_x,
+    int min_y,
+    int max_x,
+    int max_y)
+{
+    if (!input_w2d_path || !output_w2d_path || !rgba || rgba_len <= 0 || img_w <= 0 || img_h <= 0)
+    {
+        g_last_error = "invalid argument";
+        return ZS_DWF_INVALID_ARGUMENT;
+    }
+    std::string error;
+    const bool ok = zs::dwf::edit::stamp_image_on_w2d(
+        input_w2d_path, output_w2d_path, rgba, static_cast<std::size_t>(rgba_len),
+        img_w, img_h, min_x, min_y, max_x, max_y, error);
+    if (!ok)
+    {
+        g_last_error = error;
+        return ZS_DWF_RENDER_FAILED;
+    }
+    g_last_error.clear();
+    return ZS_DWF_OK;
 }
 
 extern "C" ZS_DWF_API const char* zs_dwf_get_last_error()
