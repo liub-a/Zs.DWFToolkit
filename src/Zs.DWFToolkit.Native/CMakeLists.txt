@@ -230,6 +230,12 @@ if(ZS_DWF_ENABLE_ODA_DWFTK)
         target_link_libraries(zs_dwf_toolkit_native PRIVATE
             -Wl,--start-group ${_oda_libs} ${ZS_JPEG_LIB} zlibstatic -Wl,--end-group)
     endif()
+
+    if(MSVC)
+        # DwfCore's DWFUUIDImpl_Win32::uuid calls UuidCreate, which lives in
+        # Rpcrt4.lib (RPC runtime); not linked by default (LNK2019 __imp_UuidCreate).
+        target_link_libraries(zs_dwf_toolkit_native PRIVATE rpcrt4)
+    endif()
 endif()
 
 if(ZS_DWF_BUILD_TESTS)
@@ -270,6 +276,9 @@ if(ZS_DWF_BUILD_TESTS)
         else()
             target_link_libraries(w2d_roundtrip_tests PRIVATE
                 -Wl,--start-group ${_oda_test_libs} ${ZS_JPEG_LIB} zlibstatic -Wl,--end-group)
+        endif()
+        if(MSVC)
+            target_link_libraries(w2d_roundtrip_tests PRIVATE rpcrt4)
         endif()
         add_test(NAME w2d_roundtrip_tests COMMAND w2d_roundtrip_tests)
 
