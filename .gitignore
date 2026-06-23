@@ -1,6 +1,7 @@
-bin/
-obj/
-build/
+# Anchor to repo root so vendored third_party/*/build dirs are NOT ignored.
+/build/
+/bin/
+/obj/
 artifacts/
 TestResults/
 .vs/
