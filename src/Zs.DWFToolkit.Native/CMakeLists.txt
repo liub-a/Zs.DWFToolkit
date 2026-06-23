@@ -13,6 +13,12 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # zlib/libtiff/freetype are C, so this only affects C++ translation units.
 if(MSVC)
   add_compile_options(/Zc:wchar_t-)
+  # ODA's win32 sources (e.g. publisher/win32/FontSubset.cpp) use the
+  # GetSystemDirectory/LoadLibrary macros with wide (wchar_t) buffers and L"..."
+  # literals. Without UNICODE defined the macros resolve to the ANSI *A variants,
+  # which reject wchar_t* (C2664). Define UNICODE/_UNICODE so they bind to the wide
+  # variants, matching the toolkit's standard Windows configuration.
+  add_compile_definitions(UNICODE _UNICODE)
 endif()
 
 option(ZS_DWF_ENABLE_ODA_DWFTK "Build and link the bundled ODA-modified DWFToolkit-7.7 source" OFF)
