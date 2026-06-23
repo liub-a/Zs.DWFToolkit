@@ -78,3 +78,20 @@ Console.WriteLine(head.Contains("(View "));    // False（期望 True）
 
 - Zs.DWFToolkit 0.5.1（osx-arm64 / linux-x64，均含 `zs_w2d_stamp_image` 导出）。
 - 样本：`Plot/DWF/2_A1.dwf`（A1，`(DWF V06.00)`，单页 W2D）。
+
+---
+
+## 修复（已实现）
+
+`src/edit/W2dStamp.cpp` 的 `register_passthrough` 之前只为几何/部分属性注册了重序列化回调，
+未注册 `(View)/(PlotInfo)/(Units)/(Named_View)/(Background)/(DWF_Header)` 等头部/元数据操作码，
+导致它们走默认处理被丢弃。
+
+修复：为这些头部/元数据/文档属性/补充属性操作码补注册 `reserialize<>` 透传回调
+（`WT_Drawing_Info` 是聚合容器、非 WT_Object，无 serialize，排除）。
+
+验证（osx-arm64）：对 `Plot/DWF/2_A1.dwf` 抽 w2d 写回后，头部含
+`(View 0,0 39732,28062)(PlotInfo show 0 mm 845 598 …)`，与原件一致。
+
+> 注意：仅重编了 osx-arm64 dylib。**linux-x64 / linux-arm64 / win-x64 需在 manylinux/CI 重编**
+> 并刷新 `native-prebuilt/`，否则服务器(linux)仍是旧 native。

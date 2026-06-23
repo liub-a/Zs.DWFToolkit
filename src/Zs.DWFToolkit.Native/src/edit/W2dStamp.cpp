@@ -54,26 +54,76 @@ WT_Result on_end(WT_End_Of_DWF& /*item*/, WT_File& in)
 
 void register_passthrough(WT_File& f)
 {
-    // Geometry + attributes that appear in typical 2D ePlot W2D. Unhandled rare
-    // opcodes fall through to default processing (not copied).
+    // ---- 头部 / 元数据：必须原样回写，否则图幅尺寸/视图/单位等丢失，渲染纵横比错。 ----
+    // (View)/(PlotInfo)/(Units) 等若不注册会走默认处理被丢弃（见 ISSUE-stamp-loses-plotinfo）。
+    f.set_units_action(reserialize<WT_Units>);
+    f.set_view_action(reserialize<WT_View>);
+    f.set_named_view_action(reserialize<WT_Named_View>);
+    f.set_named_view_list_action(reserialize<WT_Named_View_List>);
+    f.set_plot_info_action(reserialize<WT_Plot_Info>);
+    f.set_plot_optimized_action(reserialize<WT_Plot_Optimized>);
+    f.set_background_action(reserialize<WT_Background>);
+    f.set_dwf_header_action(reserialize<WT_DWF_Header>);
+    f.set_color_map_action(reserialize<WT_Color_Map>);
+    f.set_code_page_action(reserialize<WT_Code_Page>);
+    f.set_orientation_action(reserialize<WT_Orientation>);
+    f.set_origin_action(reserialize<WT_Origin>);
+    f.set_inked_area_action(reserialize<WT_Inked_Area>);
+    f.set_merge_control_action(reserialize<WT_Merge_Control>);
+    f.set_directory_action(reserialize<WT_Directory>);
+    f.set_guid_action(reserialize<WT_Guid>);
+    f.set_guid_list_action(reserialize<WT_Guid_List>);
+    // 文档属性元数据（来源/作者/时间等），原样保留。
+    f.set_author_action(reserialize<WT_Author>);
+    f.set_creator_action(reserialize<WT_Creator>);
+    f.set_title_action(reserialize<WT_Title>);
+    f.set_subject_action(reserialize<WT_Subject>);
+    f.set_keywords_action(reserialize<WT_Keywords>);
+    f.set_comments_action(reserialize<WT_Comments>);
+    f.set_copyright_action(reserialize<WT_Copyright>);
+    f.set_description_action(reserialize<WT_Description>);
+    f.set_creation_time_action(reserialize<WT_Creation_Time>);
+    f.set_modification_time_action(reserialize<WT_Modification_Time>);
+    f.set_source_filename_action(reserialize<WT_Source_Filename>);
+    f.set_source_creation_time_action(reserialize<WT_Source_Creation_Time>);
+    f.set_source_modification_time_action(reserialize<WT_Source_Modification_Time>);
+
+    // ---- 几何 + 属性：典型 2D ePlot W2D 内容。 ----
     f.set_color_action(reserialize<WT_Color>);
+    f.set_contrast_color_action(reserialize<WT_Contrast_Color>);
     f.set_line_weight_action(reserialize<WT_Line_Weight>);
     f.set_line_pattern_action(reserialize<WT_Line_Pattern>);
     f.set_line_style_action(reserialize<WT_Line_Style>);
+    f.set_dash_pattern_action(reserialize<WT_Dash_Pattern>);
+    f.set_pen_pattern_action(reserialize<WT_Pen_Pattern>);
     f.set_fill_action(reserialize<WT_Fill>);
     f.set_fill_pattern_action(reserialize<WT_Fill_Pattern>);
+    f.set_user_fill_pattern_action(reserialize<WT_User_Fill_Pattern>);
+    f.set_user_hatch_pattern_action(reserialize<WT_User_Hatch_Pattern>);
     f.set_visibility_action(reserialize<WT_Visibility>);
+    f.set_delineate_action(reserialize<WT_Delineate>);
     f.set_layer_action(reserialize<WT_Layer>);
     f.set_viewport_action(reserialize<WT_Viewport>);
+    f.set_object_node_action(reserialize<WT_Object_Node>);
     f.set_font_action(reserialize<WT_Font>);
+    f.set_font_extension_action(reserialize<WT_Font_Extension>);
+    f.set_marker_size_action(reserialize<WT_Marker_Size>);
+    f.set_marker_symbol_action(reserialize<WT_Marker_Symbol>);
     f.set_polyline_action(reserialize<WT_Polyline>);
     f.set_polygon_action(reserialize<WT_Polygon>);
     f.set_polytriangle_action(reserialize<WT_Polytriangle>);
     f.set_polymarker_action(reserialize<WT_Polymarker>);
+    f.set_gouraud_polyline_action(reserialize<WT_Gouraud_Polyline>);
+    f.set_gouraud_polytriangle_action(reserialize<WT_Gouraud_Polytriangle>);
     f.set_outline_ellipse_action(reserialize<WT_Outline_Ellipse>);
     f.set_filled_ellipse_action(reserialize<WT_Filled_Ellipse>);
     f.set_contour_set_action(reserialize<WT_Contour_Set>);
     f.set_text_action(reserialize<WT_Text>);
+    f.set_text_halign_action(reserialize<WT_Text_HAlign>);
+    f.set_text_valign_action(reserialize<WT_Text_VAlign>);
+    f.set_text_background_action(reserialize<WT_Text_Background>);
+    f.set_group_begin_action(reserialize<WT_Group_Begin>);
+    f.set_group_end_action(reserialize<WT_Group_End>);
     f.set_image_action(reserialize<WT_Image>);
     f.set_end_of_dwf_action(on_end);
 }
