@@ -55,4 +55,16 @@ public sealed class ZsDwfToolkit
         DwfStampRect rect,
         CancellationToken cancellationToken = default)
         => _editor.StampImageOnW2dAsync(inputW2dPath, outputW2dPath, rgbaPixels, imageWidth, imageHeight, rect, cancellationToken);
+
+    /// <summary>
+    /// 包级写回签署：把多个印章（按右下角锚点的毫米位置）贴进 DWF 内每页 W2D，输出合法签署 DWF。
+    /// 自动完成 W2D 坐标换算、多页分发、DWF 重打包（含 (DWF V06.00) 前缀与 ZIP 偏移修正）。
+    /// 图幅尺寸/视图等头部元数据原样保留，外部阅读器与本库渲染均保持正确纵横比。
+    /// </summary>
+    public Task<DwfRenderResult> StampImagesOnDwfAsync(
+        string inputDwfPath,
+        string outputDwfPath,
+        IReadOnlyList<DwfImageStamp> stamps,
+        CancellationToken cancellationToken = default)
+        => new Edit.DwfPackageStamper(_editor).StampAsync(inputDwfPath, outputDwfPath, stamps, cancellationToken);
 }
