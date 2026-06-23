@@ -1,7 +1,7 @@
-# Anchor to repo root so vendored third_party/*/build dirs are NOT ignored.
+bin/
+obj/
+# Anchor build/ to repo root so vendored third_party/libtiff/build is NOT ignored.
 /build/
-/bin/
-/obj/
 artifacts/
 TestResults/
 .vs/
