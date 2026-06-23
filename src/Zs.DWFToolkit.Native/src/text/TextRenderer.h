@@ -32,8 +32,9 @@ public:
 
 private:
     bool _ready{false};
-    void* _library{nullptr}; // FT_Library
-    void* _face{nullptr};    // FT_Face
+    void* _library{nullptr};  // FT_Library
+    void* _face{nullptr};     // FT_Face (primary, Latin)
+    void* _fallback{nullptr}; // FT_Face (CJK/other-script fallback)
 };
 
 } // namespace zs::dwf::text

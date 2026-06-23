@@ -49,19 +49,26 @@ if(ZS_DWF_WITH_FREETYPE)
     set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/freetype" "${CMAKE_BINARY_DIR}/freetype" EXCLUDE_FROM_ALL)
 
-    # Compile the bundled font into the library as a byte array (build-time generated).
-    set(ZS_DWF_FONT_TTF "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/fonts/DejaVuSans.ttf")
+    # Compile the bundled fonts into the library as byte arrays (build-time
+    # generated): DejaVu Sans for Latin, Droid Sans Fallback for CJK and other
+    # scripts DejaVu does not cover.
     set(ZS_DWF_FONT_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/embedded_font.h")
-    file(READ "${ZS_DWF_FONT_TTF}" ZS_DWF_FONT_HEX HEX)
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/fonts/DejaVuSans.ttf" ZS_DWF_FONT_HEX HEX)
     string(LENGTH "${ZS_DWF_FONT_HEX}" ZS_DWF_FONT_HEXLEN)
     math(EXPR ZS_DWF_FONT_LEN "${ZS_DWF_FONT_HEXLEN} / 2")
     string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," ZS_DWF_FONT_BYTES "${ZS_DWF_FONT_HEX}")
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/fonts/DroidSansFallback.ttf" ZS_DWF_FB_HEX HEX)
+    string(LENGTH "${ZS_DWF_FB_HEX}" ZS_DWF_FB_HEXLEN)
+    math(EXPR ZS_DWF_FB_LEN "${ZS_DWF_FB_HEXLEN} / 2")
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," ZS_DWF_FB_BYTES "${ZS_DWF_FB_HEX}")
     file(WRITE "${ZS_DWF_FONT_HEADER}"
-        "// Generated at configure time from third_party/fonts/DejaVuSans.ttf. Do not edit.\n"
+        "// Generated at configure time from third_party/fonts/*.ttf. Do not edit.\n"
         "#pragma once\n"
         "namespace zs { namespace dwf { namespace text {\n"
         "static const unsigned char kEmbeddedFont[] = {${ZS_DWF_FONT_BYTES}};\n"
         "static const unsigned long kEmbeddedFontSize = ${ZS_DWF_FONT_LEN}UL;\n"
+        "static const unsigned char kEmbeddedFallbackFont[] = {${ZS_DWF_FB_BYTES}};\n"
+        "static const unsigned long kEmbeddedFallbackFontSize = ${ZS_DWF_FB_LEN}UL;\n"
         "}}}\n")
 
     target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_WITH_FREETYPE=1)

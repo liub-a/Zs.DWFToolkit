@@ -7,8 +7,13 @@ by themselves and the reserved font names are respected.
 
 - DejaVu Fonts: https://dejavu-fonts.github.io/ (license: Bitstream Vera + Arev, free)
 
-This font is compiled into `zs_dwf_toolkit_native` (when built with
-`ZS_DWF_WITH_FREETYPE=ON`) so text rendering needs no system font.
+`DroidSansFallback.ttf` is **Droid Sans Fallback** (Android Open Source Project),
+used as the CJK / wide-coverage fallback so Chinese/Japanese/Korean text in DWF
+drawings renders instead of showing tofu boxes. License: Apache License 2.0.
+
+Both fonts are compiled into `zs_dwf_toolkit_native` (when built with
+`ZS_DWF_WITH_FREETYPE=ON`) so text rendering needs no system font. The renderer
+picks the primary (DejaVu) or fallback (Droid) face per code point.
 
 # FreeType
 
