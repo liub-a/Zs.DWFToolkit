@@ -7,6 +7,7 @@
 //   zs_dwf_worker info   <input>
 //   zs_dwf_worker page   <input> <page> <output> <width> <height> <dpi>
 //   zs_dwf_worker w2d    <input> <output> <width> <height> <dpi>
+//   zs_dwf_worker pdf    <input> <output.pdf>
 #include "zs_dwf_toolkit_native.h"
 
 #include <cstdio>
@@ -25,7 +26,8 @@ int usage()
         "usage:\n"
         "  zs_dwf_worker info <input>\n"
         "  zs_dwf_worker page <input> <page> <output> <width> <height> <dpi>\n"
-        "  zs_dwf_worker w2d  <input> <output> <width> <height> <dpi>\n");
+        "  zs_dwf_worker w2d  <input> <output> <width> <height> <dpi>\n"
+        "  zs_dwf_worker pdf  <input> <output.pdf>\n");
     return ZS_DWF_INVALID_ARGUMENT;
 }
 
@@ -60,6 +62,14 @@ int main(int argc, char** argv)
         rc = zs_w2d_render_file(argv[2], argv[3],
                                 std::atoi(argv[4]), std::atoi(argv[5]), std::atoi(argv[6]),
                                 json.data(), kJsonBuffer);
+    }
+    else if (cmd == "pdf" && argc == 4)
+    {
+        // pdf <input.dwf|.w2d> <output.pdf>
+        rc = zs_dwf_render_dwf_pdf(argv[2], argv[3]);
+        if (rc != ZS_DWF_OK)
+            std::fprintf(stderr, "pdf rc=%d %s\n", rc, zs_dwf_get_last_error());
+        return rc;
     }
     else if (cmd == "stamp" && argc == 11)
     {

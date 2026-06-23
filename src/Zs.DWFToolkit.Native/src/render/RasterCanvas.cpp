@@ -1,4 +1,5 @@
 #include "RasterCanvas.h"
+#include "../text/TextRenderer.h"
 #include <cstdlib>
 
 namespace zs::dwf::native_render
@@ -478,6 +479,20 @@ void RasterCanvas::draw_text_marker(PointD position, int glyph_count, Rgba color
         {position.x, position.y + logical_h}
     };
     draw_polyline(box, color, std::max(1, thickness), true);
+}
+
+bool RasterCanvas::draw_text(const unsigned short* codepoints, int count, PointD position_logical,
+                             double height_units, double rotation_deg, Rgba color)
+{
+    if (!_text || !_text->ready() || !codepoints || count <= 0)
+        return false;
+    const PointD pen = to_pixel(position_logical);
+    int px_height = static_cast<int>(std::llround(height_units * _scale));
+    if (px_height < 6) px_height = 12;
+    return _text->draw(*this, codepoints, count,
+                       static_cast<int>(std::llround(pen.x)),
+                       static_cast<int>(std::llround(pen.y)),
+                       px_height, rotation_deg, color);
 }
 
 } // namespace zs::dwf::native_render

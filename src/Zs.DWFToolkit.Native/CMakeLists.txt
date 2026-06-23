@@ -44,6 +44,8 @@ add_library(zs_dwf_toolkit_native SHARED
     src/zs_dwf_toolkit_native.cpp
     src/render/MinimalPng.cpp
     src/render/RasterCanvas.cpp
+    src/pdf/MinimalPdf.cpp
+    src/pdf/PdfVectorCanvas.cpp
     src/text/TextRenderer.cpp
     src/image/Group4Decoder.cpp
     src/edit/W2dStamp.cpp
@@ -157,6 +159,9 @@ if(ZS_DWF_ENABLE_ODA_DWFTK)
     file(MAKE_DIRECTORY "${ODA_LIB_DIR}" "${ODA_BIN_DIR}")
 
     target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_WITH_ODA_DWFTK=1)
+    # zlib is vendored and linked in this branch, so MinimalPdf can FlateDecode-
+    # compress PDF content streams (vector linework compresses ~10x).
+    target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_WITH_ZLIB=1)
     target_include_directories(zs_dwf_toolkit_native PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/compat/oda
         ${CMAKE_CURRENT_SOURCE_DIR}/compat/oda/Include
@@ -250,8 +255,16 @@ if(ZS_DWF_BUILD_TESTS)
         tests/raster_canvas_tests.cpp
         src/render/RasterCanvas.cpp
         src/render/MinimalPng.cpp
+        src/text/TextRenderer.cpp
     )
     target_include_directories(raster_canvas_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    # RasterCanvas::draw_text delegates to TextRenderer, so the standalone test must
+    # link it (and FreeType when enabled); otherwise TextRenderer compiles to no-ops.
+    if(ZS_DWF_WITH_FREETYPE)
+        target_compile_definitions(raster_canvas_tests PRIVATE ZS_DWF_WITH_FREETYPE=1)
+        target_include_directories(raster_canvas_tests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+        target_link_libraries(raster_canvas_tests PRIVATE freetype)
+    endif()
     add_test(NAME raster_canvas_tests COMMAND raster_canvas_tests)
 
     # End-to-end W2D round-trip needs the WHIP Toolkit (to write a W2D) and our

@@ -56,6 +56,14 @@ ZS_DWF_API int zs_w2d_render_file(
     char* output_json,
     int output_json_size);
 
+// Renders every 2D page of a DWF/DWFx (or a bare W2D stream) to a single
+// multi-page, true-vector PDF (paths/fills + glyph-outline text). Returns
+// ZS_DWF_OK on success; output is far smaller than rasterized pages and is
+// resolution-independent. Requires the ODA build.
+ZS_DWF_API int zs_dwf_render_dwf_pdf(
+    const char* input_path,
+    const char* output_pdf_path);
+
 // Stamps an RGBA image onto a W2D stream (copies all opcodes, appends a WT_Image
 // at the logical rectangle). rgba is row-major img_w*img_h*4 bytes. Returns
 // ZS_DWF_OK on success. Requires the ODA build.

@@ -26,4 +26,9 @@ struct InfoResult
 
 InfoResult get_dwf_info_json(const std::string& input_path);
 
+// Renders every 2D page of a DWF/DWFx (or a bare W2D stream) to a single
+// multi-page, true-vector PDF written to output_pdf_path. Returns an
+// unsupported result when built without ZS_DWF_WITH_ODA_DWFTK.
+zs::dwf::w2d::RenderResult render_dwf_to_pdf(const std::string& input_path, const std::string& output_pdf_path);
+
 } // namespace zs::dwf::oda

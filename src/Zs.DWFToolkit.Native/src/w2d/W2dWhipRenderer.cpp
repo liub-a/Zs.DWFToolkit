@@ -1,6 +1,8 @@
 #include "W2dWhipRenderer.h"
 #include "../render/RasterCanvas.h"
 #include "../render/MinimalPng.h"
+#include "../pdf/MinimalPdf.h"
+#include "../pdf/PdfVectorCanvas.h"
 
 #include <algorithm>
 #include <cmath>
@@ -56,7 +58,7 @@ namespace
     {
         bool collecting{true};
         BoxD bounds;
-        RasterCanvas* canvas{nullptr};
+        ICanvas* canvas{nullptr};
         int polyline_count{0};
         int polygon_count{0};
         int outline_ellipse_count{0};
@@ -68,7 +70,6 @@ namespace
         int polymarker_count{0};
         int macro_draw_count{0};
         int unsupported_count{0};
-        zs::dwf::text::TextRenderer* text{nullptr};
     };
 
     W2dContext* ctx(WT_File& file)
@@ -90,7 +91,7 @@ namespace
         return { rgba.m_rgb.r, rgba.m_rgb.g, rgba.m_rgb.b, rgba.m_rgb.a };
     }
 
-    int current_thickness(WT_File& file, const RasterCanvas* canvas)
+    int current_thickness(WT_File& file, const ICanvas* canvas)
     {
         const int w = file.rendition().line_weight().weight_value();
         if (w <= 0 || canvas == nullptr)
@@ -101,7 +102,7 @@ namespace
     // Maps the current line pattern to dash on/off lengths in pixels (scaled to the
     // canvas). Returns {0,0} for a solid line. First-pass approximation: a couple of
     // representative dash/dot cadences rather than the exact WHIP pattern tables.
-    std::pair<double, double> current_dash(WT_File& file, const RasterCanvas* canvas)
+    std::pair<double, double> current_dash(WT_File& file, const ICanvas* canvas)
     {
         const double s = (canvas ? canvas->scale() : 1.0);
         const double unit = std::max(1.0, 6.0 * s);
@@ -348,26 +349,16 @@ namespace
         else if (c->canvas && is_visible(file))
         {
             const Rgba color = current_color(file);
-            const auto pen = c->canvas->to_pixel(p);
-            // Font height is in drawing units; map to pixels via the canvas scale.
-            const int font_units = file.rendition().font().height().height();
-            int px_height = static_cast<int>(std::llround(font_units * c->canvas->scale()));
-            if (px_height < 6) px_height = 12;
-
+            // Font height is in drawing units; the canvas maps it to its own space.
+            const double font_units = file.rendition().font().height().height();
             // Unicode (UTF-16) string + font rotation (360/65536ths of a degree).
             const WT_Unsigned_Integer16* cps = item.string().unicode();
             const int n = item.string().length();
             const double rotation_deg =
                 file.rendition().font().rotation().rotation() * 360.0 / 65536.0;
 
-            bool drawn = false;
-            if (c->text && c->text->ready() && cps && n > 0)
-            {
-                drawn = c->text->draw(*c->canvas, cps, n,
-                                      static_cast<int>(std::llround(pen.x)),
-                                      static_cast<int>(std::llround(pen.y)),
-                                      px_height, rotation_deg, color);
-            }
+            const bool drawn = (cps && n > 0) &&
+                c->canvas->draw_text(cps, n, p, font_units, rotation_deg, color);
             if (!drawn)
                 c->canvas->draw_text_marker(p, glyphs, color, current_thickness(file, c->canvas));
         }
@@ -729,11 +720,11 @@ RenderResult render_w2d_file_to_png(
     const int ss = 2;
     RasterCanvas canvas(width_px * ss, height_px * ss, collector.bounds);
     zs::dwf::text::TextRenderer text_renderer;
+    canvas.set_text_renderer(&text_renderer);
     W2dContext painter;
     painter.collecting = false;
     painter.bounds = collector.bounds;
     painter.canvas = &canvas;
-    painter.text = &text_renderer;
     result = process_w2d(w2d_path, painter);
     if (result != WT_Result::Success)
     {
@@ -792,6 +783,64 @@ RenderResult render_w2d_file_to_png(
          << "}";
 
     return RenderResult{true, 0, "", "", json.str()};
+#endif
+}
+
+RenderResult render_w2d_file_to_pdf_page(
+    const std::string& w2d_path,
+    zs::dwf::pdf::PdfPage& out_page)
+{
+#ifndef ZS_DWF_WITH_ODA_DWFTK
+    (void)w2d_path;
+    (void)out_page;
+    return RenderResult{false, 1007, "unsupported_dwf_rendering",
+        "W2D vector PDF requires building native library with ZS_DWF_ENABLE_ODA_DWFTK=ON.", ""};
+#else
+    std::ifstream probe(w2d_path, std::ios::binary);
+    if (!probe.good())
+        return RenderResult{false, 1002, "file_not_found", "W2D input file is not readable", ""};
+
+    W2dContext collector;
+    collector.collecting = true;
+    WT_Result result = process_w2d(w2d_path, collector);
+    if (result != WT_Result::Success)
+    {
+        const std::string name = wt_result_name(result);
+        return RenderResult{false, 1007, "w2d_parse_failed", "Failed to parse W2D stream: " + name, ""};
+    }
+    if (!collector.bounds.valid())
+        return RenderResult{false, 1007, "w2d_empty_bounds", "W2D stream did not produce a drawable/view bounding box", ""};
+
+    const double dx = std::max(1.0, (collector.bounds.max_x - collector.bounds.min_x) * 0.01);
+    const double dy = std::max(1.0, (collector.bounds.max_y - collector.bounds.min_y) * 0.01);
+    collector.bounds.min_x -= dx;
+    collector.bounds.max_x += dx;
+    collector.bounds.min_y -= dy;
+    collector.bounds.max_y += dy;
+
+    const double bw = collector.bounds.max_x - collector.bounds.min_x;
+    const double bh = collector.bounds.max_y - collector.bounds.min_y;
+    // Page in points, aspect-preserving; longer side = A1 long edge (841mm = 2384pt).
+    // The viewer/printer scales to the target paper; what matters is correct aspect.
+    constexpr double kLongPt = 2384.0;
+    double pw, ph;
+    if (bw >= bh) { pw = kLongPt; ph = (bw > 0) ? kLongPt * bh / bw : kLongPt; }
+    else          { ph = kLongPt; pw = (bh > 0) ? kLongPt * bw / bh : kLongPt; }
+
+    zs::dwf::pdf::PdfVectorCanvas canvas(collector.bounds, pw, ph);
+    W2dContext painter;
+    painter.collecting = false;
+    painter.bounds = collector.bounds;
+    painter.canvas = &canvas;
+    result = process_w2d(w2d_path, painter);
+    if (result != WT_Result::Success)
+    {
+        const std::string name = wt_result_name(result);
+        return RenderResult{false, 1007, "w2d_render_failed", "Failed to render W2D stream: " + name, ""};
+    }
+
+    out_page = canvas.take_page();
+    return RenderResult{true, 0, "", "", ""};
 #endif
 }
 

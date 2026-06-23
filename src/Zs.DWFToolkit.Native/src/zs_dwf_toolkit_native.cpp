@@ -166,6 +166,21 @@ extern "C" ZS_DWF_API int zs_w2d_render_file(
     return result.success ? ZS_DWF_OK : result.result_code;
 }
 
+extern "C" ZS_DWF_API int zs_dwf_render_dwf_pdf(
+    const char* input_path,
+    const char* output_pdf_path)
+{
+    if (!input_path || std::strlen(input_path) == 0 ||
+        !output_pdf_path || std::strlen(output_pdf_path) == 0)
+    {
+        g_last_error = "input_path and output_pdf_path are required";
+        return ZS_DWF_INVALID_ARGUMENT;
+    }
+    auto result = zs::dwf::oda::render_dwf_to_pdf(input_path, output_pdf_path);
+    g_last_error = result.success ? std::string() : (result.error_code + ": " + result.error_message);
+    return result.success ? ZS_DWF_OK : result.result_code;
+}
+
 extern "C" ZS_DWF_API int zs_w2d_stamp_image(
     const char* input_w2d_path,
     const char* output_w2d_path,

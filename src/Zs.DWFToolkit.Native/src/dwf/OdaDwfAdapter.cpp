@@ -1,4 +1,5 @@
 #include "OdaDwfAdapter.h"
+#include "../pdf/MinimalPdf.h"
 
 #include <chrono>
 #include <cstdio>
@@ -232,6 +233,98 @@ RenderResult render_dwf_or_w2d_page_to_png(
         std::error_code ec;
         std::filesystem::remove(temp_w2d, ec);
         return rr;
+    }
+    catch (const DWFCore::DWFException& ex)
+    {
+        return RenderResult{false, 1007, "dwf_toolkit_exception", narrow(ex.type()) + ": " + narrow(ex.message()), ""};
+    }
+    catch (const std::exception& ex)
+    {
+        return RenderResult{false, 1999, "native_exception", ex.what(), ""};
+    }
+    catch (...)
+    {
+        return RenderResult{false, 1999, "native_exception", "Unknown native exception", ""};
+    }
+#endif
+}
+
+RenderResult render_dwf_to_pdf(const std::string& input_path, const std::string& output_pdf_path)
+{
+#ifndef ZS_DWF_WITH_ODA_DWFTK
+    (void)input_path;
+    (void)output_pdf_path;
+    return RenderResult{false, 1007, "unsupported_dwf_rendering",
+        "Native DWF vector PDF requires building with ZS_DWF_ENABLE_ODA_DWFTK=ON.", ""};
+#else
+    try
+    {
+        DWFCore::DWFFile file(input_path.c_str());
+        DWFToolkit::DWFPackageReader reader(file);
+        DWFToolkit::DWFPackageReader::tPackageInfo info;
+        reader.getPackageInfo(info);
+
+        std::vector<zs::dwf::pdf::PdfPage> pages;
+
+        if (info.eType == DWFToolkit::DWFPackageReader::eW2DStream ||
+            info.eType == DWFToolkit::DWFPackageReader::eDWFStream)
+        {
+            zs::dwf::pdf::PdfPage page;
+            RenderResult rr = zs::dwf::w2d::render_w2d_file_to_pdf_page(input_path, page);
+            if (!rr.success)
+                return rr;
+            pages.push_back(std::move(page));
+        }
+        else if (info.eType == DWFToolkit::DWFPackageReader::eDWFPackage ||
+                 info.eType == DWFToolkit::DWFPackageReader::eDWFXPackage)
+        {
+            DWFToolkit::DWFManifest& manifest = reader.getManifest();
+            DWFToolkit::DWFManifest::SectionIterator* sections = manifest.getSections();
+            if (!sections)
+                return RenderResult{false, 1006, "page_not_found", "DWF manifest contains no sections", ""};
+
+            int idx = 0;
+            for (; sections->valid(); sections->next())
+            {
+                DWFToolkit::DWFSection* section = sections->get();
+                if (!section)
+                    continue;
+                DWFToolkit::DWFResource* resource = first_w2d_resource(*section);
+                if (!resource) { ++idx; continue; }
+
+                DWFCore::DWFInputStream* stream = reader.extract(resource->href(), false);
+                if (!stream) { ++idx; continue; }
+
+                const std::string temp_w2d = make_temp_w2d_path(idx);
+                std::string extract_error;
+                const bool extracted = extract_stream_to_file(*stream, temp_w2d, extract_error);
+                DWFCORE_FREE_OBJECT(stream);
+                if (extracted)
+                {
+                    zs::dwf::pdf::PdfPage page;
+                    RenderResult rr = zs::dwf::w2d::render_w2d_file_to_pdf_page(temp_w2d, page);
+                    if (rr.success)
+                        pages.push_back(std::move(page));
+                }
+                std::error_code ec;
+                std::filesystem::remove(temp_w2d, ec);
+                ++idx;
+            }
+            DWFCORE_FREE_OBJECT(sections);
+        }
+        else
+        {
+            return RenderResult{false, 1004, "unsupported_format", "Input is not a DWF package or W2D stream", ""};
+        }
+
+        if (pages.empty())
+            return RenderResult{false, 1007, "w2d_resource_not_found", "No renderable 2D pages found in the DWF", ""};
+
+        std::string err;
+        if (!zs::dwf::pdf::write_pdf(output_pdf_path, pages, err))
+            return RenderResult{false, 1008, "output_failed", err, ""};
+
+        return RenderResult{true, 0, "", "", ""};
     }
     catch (const DWFCore::DWFException& ex)
     {
