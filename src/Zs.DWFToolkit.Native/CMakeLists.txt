@@ -19,10 +19,21 @@ if(MSVC)
   # which reject wchar_t* (C2664). Define UNICODE/_UNICODE so they bind to the wide
   # variants, matching the toolkit's standard Windows configuration.
   add_compile_definitions(UNICODE _UNICODE)
-  # whiptk headers include <windows.h>, whose min/max macros break
-  # std::numeric_limits<T>::max() and std::max/std::min (C2589). Suppress them.
-  add_compile_definitions(NOMINMAX)
+  # NOTE: NOMINMAX is intentionally NOT defined globally here. ODA's own win32
+  # sources (e.g. XAML/win32/XamlFontUtilImpl.cpp) call the bare min()/max() macros
+  # from <windows.h>, so suppressing them breaks the toolkit (C3861). We instead
+  # define NOMINMAX per-target on our own translation units (which use std::max /
+  # std::numeric_limits<T>::max()) via ZS_DWF_OUR_MSVC_DEFS below.
 endif()
+
+# MSVC-only compile definitions for OUR translation units (not the ODA subdir):
+# NOMINMAX so <windows.h> (pulled in by whiptk headers) does not shadow std::max /
+# std::min / std::numeric_limits<T>::max() (C2589).
+function(zs_dwf_apply_our_msvc_defs _tgt)
+    if(MSVC)
+        target_compile_definitions(${_tgt} PRIVATE NOMINMAX)
+    endif()
+endfunction()
 
 option(ZS_DWF_ENABLE_ODA_DWFTK "Build and link the bundled ODA-modified DWFToolkit-7.7 source" OFF)
 option(ZS_DWF_BUILD_TESTS "Build native RasterCanvas unit tests (CTest)" OFF)
@@ -49,6 +60,7 @@ target_include_directories(zs_dwf_toolkit_native PRIVATE
 )
 
 target_compile_definitions(zs_dwf_toolkit_native PRIVATE ZS_DWF_TOOLKIT_NATIVE_EXPORTS)
+zs_dwf_apply_our_msvc_defs(zs_dwf_toolkit_native)
 
 # Out-of-process render worker: the managed library invokes this with a timeout so
 # a native crash/hang is isolated from the host. Built alongside the shared library.
@@ -56,6 +68,7 @@ option(ZS_DWF_BUILD_WORKER "Build the zs_dwf_worker out-of-process render execut
 if(ZS_DWF_BUILD_WORKER)
     add_executable(zs_dwf_worker tools/zs_dwf_worker.cpp)
     target_link_libraries(zs_dwf_worker PRIVATE zs_dwf_toolkit_native)
+    zs_dwf_apply_our_msvc_defs(zs_dwf_worker)
 endif()
 
 if(ZS_DWF_WITH_FREETYPE)
@@ -245,6 +258,7 @@ if(ZS_DWF_BUILD_TESTS)
         # Include DwfToolkit (_DWFToolkitMemory) and wrap the circular set in a
         # --start-group on GNU ld (same reason as the shared library above).
         target_link_libraries(w2d_roundtrip_tests PRIVATE zs_dwf_toolkit_native)
+        zs_dwf_apply_our_msvc_defs(w2d_roundtrip_tests)
         set(_oda_test_libs "")
         foreach(_t DwfToolkit DwfCore WhipTk W3dTk)
             if(TARGET ${_t})
