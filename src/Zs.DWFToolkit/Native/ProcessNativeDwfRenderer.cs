@@ -52,6 +52,46 @@ public sealed class ProcessNativeDwfRenderer : INativeDwfRenderer
             new[] { "w2d", sourcePath, outputPath, Width(options), Height(options), options.Dpi.ToString(System.Globalization.CultureInfo.InvariantCulture) },
             sourcePath, 0, outputPath, options, cancellationToken);
 
+    public async Task<DwfRenderResult> RenderDwfToPdfAsync(string sourcePath, string outputPdfPath, DwfRenderOptions options, CancellationToken cancellationToken = default)
+    {
+        // The `pdf` worker command writes the PDF and reports status via exit code
+        // (no JSON on stdout), so the result is built from the exit code.
+        var run = await RunAsync(new[] { "pdf", sourcePath, outputPdfPath }, options.Timeout, cancellationToken).ConfigureAwait(false);
+        if (run is null)
+        {
+            return new DwfRenderResult
+            {
+                Success = false,
+                ErrorCode = DwfErrorCodes.NativeLibraryNotFound,
+                ErrorMessage = "Native render worker (zs_dwf_worker) was not found.",
+                SourcePath = sourcePath,
+                OutputPath = outputPdfPath,
+                ToolName = "native-vector-pdf-worker"
+            };
+        }
+        if (run.Success && File.Exists(outputPdfPath))
+        {
+            return new DwfRenderResult
+            {
+                Success = true,
+                ErrorCode = DwfErrorCodes.Ok,
+                SourcePath = sourcePath,
+                OutputPath = outputPdfPath,
+                OutputFiles = { outputPdfPath },
+                ToolName = "native-vector-pdf-worker"
+            };
+        }
+        return new DwfRenderResult
+        {
+            Success = false,
+            ErrorCode = MapFailure(run),
+            ErrorMessage = FailureMessage(run, "vector pdf"),
+            SourcePath = sourcePath,
+            OutputPath = outputPdfPath,
+            ToolName = "native-vector-pdf-worker"
+        };
+    }
+
     private async Task<DwfRenderResult> RenderAsync(string[] args, string sourcePath, int pageIndex, string outputPath, DwfRenderOptions options, CancellationToken cancellationToken)
     {
         var run = await RunAsync(args, options.Timeout, cancellationToken).ConfigureAwait(false);

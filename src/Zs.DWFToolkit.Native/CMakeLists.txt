@@ -334,6 +334,16 @@ if(ZS_DWF_BUILD_TESTS)
         target_compile_definitions(dwf_package_tests PRIVATE ZS_DWF_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../tests/data")
         add_test(NAME dwf_package_tests COMMAND dwf_package_tests)
 
+        # Vector-PDF regression: DWF -> true-vector PDF via the C ABI.
+        add_executable(pdf_vector_tests tests/pdf_vector_tests.cpp)
+        target_include_directories(pdf_vector_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+        )
+        target_link_libraries(pdf_vector_tests PRIVATE zs_dwf_toolkit_native)
+        target_compile_definitions(pdf_vector_tests PRIVATE ZS_DWF_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../tests/data")
+        add_test(NAME pdf_vector_tests COMMAND pdf_vector_tests)
+
         if(ZS_DWF_WITH_TIFF)
             add_executable(group4_tests tests/group4_tests.cpp)
             target_include_directories(group4_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)

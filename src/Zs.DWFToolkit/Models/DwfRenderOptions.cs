@@ -49,6 +49,14 @@ public sealed class DwfRenderOptions
     /// <summary>For ordinary DWF PDF conversion, render pages with the native renderer first and assemble them into PDF.</summary>
     public bool CreatePdfFromImagesFallback { get; set; } = true;
 
+    /// <summary>
+    /// Convert plain DWF to PDF as true vector graphics (drawing operators + glyph
+    /// outlines) via the native renderer, instead of rasterizing pages to images.
+    /// Output is far smaller and resolution-independent. Requires the native build;
+    /// falls back to the raster image path when the native renderer is unavailable.
+    /// </summary>
+    public bool VectorPdf { get; set; } = false;
+
     /// <summary>Optional fixed page width in PDF points for the simple image PDF writer.</summary>
     public double? PdfPageWidthPoints { get; set; }
 

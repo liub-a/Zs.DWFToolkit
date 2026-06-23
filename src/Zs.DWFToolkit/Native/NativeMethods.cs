@@ -32,6 +32,9 @@ internal static partial class NativeMethods
         StringBuilder outputJson,
         int outputJsonSize);
 
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, EntryPoint = "zs_dwf_render_dwf_pdf")]
+    internal static extern int RenderDwfToPdf(string inputPath, string outputPdfPath);
+
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, EntryPoint = "zs_w2d_stamp_image")]
     internal static extern int StampW2dImage(
         string inputW2dPath,

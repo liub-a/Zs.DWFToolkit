@@ -119,6 +119,7 @@ internal sealed class CliApp
         options.MutoolPath = GetOption("--mutool");
         options.GhostXpsPath = GetOption("--gxps");
         options.PreferNativeDwfRenderer = HasFlag("--native");
+        options.VectorPdf = HasFlag("--vector");
         options.CreatePdfFromImagesFallback = !HasFlag("--no-image-pdf-fallback");
         options.KeepTemporaryFiles = HasFlag("--keep-temp");
         if (long.TryParse(GetOption("--min-image-bytes"), out var minBytes)) options.RasterImageMinBytes = minBytes;
@@ -156,10 +157,11 @@ Usage:
   Zs.DWFToolkit.CliDemo info <file.dwf|file.dwfx>
   Zs.DWFToolkit.CliDemo thumbnail <file.dwf|file.dwfx> --out <thumb.jpg>
   Zs.DWFToolkit.CliDemo to-images <file.dwfx|file.dwf> --out-dir <dir> [--dpi 200] [--format png] [--mutool /path/mutool] [--gxps /path/gxps] [--native]
-  Zs.DWFToolkit.CliDemo to-pdf <file.dwfx|file.dwf> --out <output.pdf> [--mutool /path/mutool] [--gxps /path/gxps] [--native]
+  Zs.DWFToolkit.CliDemo to-pdf <file.dwfx|file.dwf> --out <output.pdf> [--mutool /path/mutool] [--gxps /path/gxps] [--native] [--vector]
   Zs.DWFToolkit.CliDemo render-w2d <file.w2d> --out <output.png> [--width 2400] [--height 1600] [--native]
 
 Options:
+  --vector                   Plain DWF to PDF as true vector graphics (native); falls back to raster on failure.
   --no-image-pdf-fallback    Disable ordinary DWF native-rendered image-to-PDF assembly.
   --min-image-bytes <n>      Legacy diagnostic raster extractor threshold; not used by conversion by default.
   --pdf-width <points>       Fixed PDF page width for simple image PDF writer.

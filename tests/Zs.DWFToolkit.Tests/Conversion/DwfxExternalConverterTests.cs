@@ -24,6 +24,9 @@ public sealed class DwfxExternalConverterTests
 
         public Task<DwfRenderResult> RenderW2dFileAsync(string sourcePath, string outputPath, DwfRenderOptions options, CancellationToken ct = default)
             => Task.FromResult(new DwfRenderResult { Success = false });
+
+        public Task<DwfRenderResult> RenderDwfToPdfAsync(string sourcePath, string outputPdfPath, DwfRenderOptions options, CancellationToken ct = default)
+            => Task.FromResult(new DwfRenderResult { Success = false });
     }
 
     [Fact]

@@ -190,5 +190,52 @@ public sealed class NativeDwfRenderer : INativeDwfRenderer
         }
     }
 
+    public Task<DwfRenderResult> RenderDwfToPdfAsync(
+        string sourcePath,
+        string outputPdfPath,
+        DwfRenderOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            Internal.SafePath.EnsureParentDirectory(outputPdfPath);
+            var code = NativeMethods.RenderDwfToPdf(sourcePath, outputPdfPath);
+            if (code != 0)
+            {
+                return Task.FromResult(new DwfRenderResult
+                {
+                    Success = false,
+                    ErrorCode = DwfErrorCodes.NativeRenderFailed,
+                    ErrorMessage = NativeMethods.GetLastErrorString() ?? $"Native vector PDF failed with code {code}.",
+                    SourcePath = sourcePath,
+                    OutputPath = outputPdfPath,
+                    ToolName = "native-vector-pdf"
+                });
+            }
+
+            return Task.FromResult(new DwfRenderResult
+            {
+                Success = true,
+                ErrorCode = DwfErrorCodes.Ok,
+                SourcePath = sourcePath,
+                OutputPath = outputPdfPath,
+                OutputFiles = { outputPdfPath },
+                ToolName = "native-vector-pdf"
+            });
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
+        {
+            return Task.FromResult(new DwfRenderResult
+            {
+                Success = false,
+                ErrorCode = DwfErrorCodes.NativeLibraryNotFound,
+                ErrorMessage = ex.Message,
+                SourcePath = sourcePath,
+                OutputPath = outputPdfPath,
+                ToolName = "native-vector-pdf"
+            });
+        }
+    }
+
     private static JsonSerializerOptions JsonOptions() => new() { PropertyNameCaseInsensitive = true };
 }

@@ -59,6 +59,18 @@ public sealed class DwfxExternalConverter : IDwfConverter
         if (kind != DwfFileKind.Dwf)
             return Unsupported(sourcePath, outputDirectory: null, "Unsupported file kind.");
 
+        // True-vector PDF: render the DWF directly to PDF drawing operators (compact,
+        // resolution-independent). Falls through to raster page assembly on failure.
+        if (options.VectorPdf && _nativeRenderer is { IsAvailable: true })
+        {
+            var vec = await _nativeRenderer.RenderDwfToPdfAsync(sourcePath, outputPdfPath, options, cancellationToken).ConfigureAwait(false);
+            if (vec.Success)
+            {
+                vec.SourcePath = sourcePath;
+                return vec;
+            }
+        }
+
         if (!options.CreatePdfFromImagesFallback)
             return Unsupported(sourcePath, outputDirectory: null, "Plain DWF to PDF requires native rendering followed by image-to-PDF assembly.");
 
