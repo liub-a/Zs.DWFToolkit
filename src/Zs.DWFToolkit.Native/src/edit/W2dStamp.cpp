@@ -63,11 +63,19 @@ void register_passthrough(WT_File& f)
     f.set_plot_info_action(reserialize<WT_Plot_Info>);
     f.set_plot_optimized_action(reserialize<WT_Plot_Optimized>);
     f.set_background_action(reserialize<WT_Background>);
-    f.set_dwf_header_action(reserialize<WT_DWF_Header>);
+    // NOTE: do NOT reserialize WT_DWF_Header. The output WT_File already writes its
+    // own "(W2D Vxx)" magic header on open; reserializing it here emits a SECOND
+    // header, and the duplicate "(W2D V06.01)(W2D V06.01)" makes readers mis-parse
+    // the stream (wrong page orientation / split layout).
     f.set_color_map_action(reserialize<WT_Color_Map>);
     f.set_code_page_action(reserialize<WT_Code_Page>);
     f.set_orientation_action(reserialize<WT_Orientation>);
-    f.set_origin_action(reserialize<WT_Origin>);
+    // NOTE: do NOT reserialize WT_Origin. (Origin) sets the file's current point,
+    // which is the base for subsequent relative-coordinate deltas. Re-emitting it
+    // desyncs the output's current point from the decoder's, offsetting ALL
+    // following geometry (observed: page maxY 28342 -> 40693, drawing pushed down
+    // and split). Geometry is reserialized with absolute points already, so the
+    // origin is not needed for correctness.
     f.set_inked_area_action(reserialize<WT_Inked_Area>);
     f.set_merge_control_action(reserialize<WT_Merge_Control>);
     f.set_directory_action(reserialize<WT_Directory>);
