@@ -9,7 +9,7 @@
   <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>Zs.DWFToolkit</PackageId>
-    <Version>0.5.5</Version>
+    <Version>0.5.6</Version>
     <Authors>Zs</Authors>
     <Description>DWF/DWFx editing and preview: package inspection, thumbnail extraction, DWFx/XPS conversion, and a native W2D/DWF renderer (ePlot -> PNG/PDF). Native binaries ship under runtimes/&lt;rid&gt;/native for plain-DWF rendering.</Description>
     <PackageTags>dwf;dwfx;w2d;cad;render;preview;autodesk;eplot</PackageTags>
