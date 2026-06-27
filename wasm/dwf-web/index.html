@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zs.DWFToolkit — in-browser DWF renderer (WebAssembly)</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 1rem; }
+  h1 { font-size: 1.1rem; margin: 0 0 .25rem; }
+  .sub { color: #888; margin: 0 0 1rem; }
+  #drop {
+    border: 2px dashed #888; border-radius: 10px; padding: 2rem; text-align: center;
+    cursor: pointer; transition: background .15s, border-color .15s;
+  }
+  #drop.hover { border-color: #2a7; background: rgba(40,170,120,.08); }
+  .row { display: flex; gap: .5rem; margin: .75rem 0; flex-wrap: wrap; align-items: center; }
+  button { padding: .4rem .8rem; border-radius: 7px; border: 1px solid #888; background: transparent; cursor: pointer; }
+  button:disabled { opacity: .4; cursor: default; }
+  #log { white-space: pre-wrap; background: rgba(128,128,128,.1); padding: .5rem .75rem; border-radius: 7px; max-height: 9rem; overflow: auto; font: 12px/1.4 ui-monospace, monospace; }
+  iframe { width: 100%; height: 70vh; border: 1px solid #888; border-radius: 7px; margin-top: .5rem; }
+</style>
+</head>
+<body>
+  <h1>Zs.DWFToolkit — DWF → vector PDF, fully in the browser</h1>
+  <p class="sub">Pure front-end. The native ODA/W2D renderer (DwfCore · WhipTk · DwfToolkit · FreeType) runs as WebAssembly. Files never leave your machine.</p>
+
+  <div id="drop">Drop a <b>.dwf</b> / <b>.w2d</b> here, or click to choose</div>
+  <input id="file" type="file" accept=".dwf,.w2d,.dwfx" hidden>
+
+  <div class="row">
+    <button id="btnInfo" disabled>Read info</button>
+    <button id="btnPdf" disabled>Render vector PDF</button>
+    <a id="dl" hidden>Download PDF</a>
+    <span id="rt" style="color:#888">loading WebAssembly runtime…</span>
+  </div>
+
+  <div id="log"></div>
+  <iframe id="view" hidden title="rendered PDF"></iframe>
+
+  <script src="zs_dwf.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

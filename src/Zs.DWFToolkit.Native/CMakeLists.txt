@@ -26,6 +26,23 @@ if(MSVC)
   # std::numeric_limits<T>::max()) via ZS_DWF_OUR_MSVC_DEFS below.
 endif()
 
+# WebAssembly (Emscripten) target. Set before any target is defined so the ODA
+# subdirectory inherits these. The ODA toolkit ships an -DEMCC code path (portable
+# <algorithm> instead of <bits/stl_algobase.h>, and major_version()/minor_version()
+# ellipse accessors to dodge the <sys/sysmacros.h> major()/minor() macros), so we
+# just enable it. Pair with scripts/setup-oda-dwftoolkit.sh (adds the wasm branch to
+# dwfcore/Core.h) and build via scripts/build-wasm.sh.
+if(EMSCRIPTEN)
+  add_compile_definitions(EMCC)
+  add_compile_options(-Wno-register -Wno-deprecated-declarations)
+  # FreeType's fcntl.h/unistd.h cross-compile checks misfire under Emscripten; seed
+  # them so its file backend (unused at runtime — we use in-memory faces) compiles.
+  set(HAVE_FCNTL_H 1 CACHE INTERNAL "")
+  set(HAVE_UNISTD_H 1 CACHE INTERNAL "")
+  # A native render worker process makes no sense in the browser.
+  set(ZS_DWF_BUILD_WORKER OFF CACHE BOOL "" FORCE)
+endif()
+
 # MSVC-only compile definitions for OUR translation units (not the ODA subdir):
 # NOMINMAX so <windows.h> (pulled in by whiptk headers) does not shadow std::max /
 # std::min / std::numeric_limits<T>::max() (C2589).

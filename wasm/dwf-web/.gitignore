@@ -1,0 +1,5 @@
+# Built WebAssembly module (regenerate with scripts/build-wasm.sh)
+zs_dwf.js
+zs_dwf.wasm
+zs_dwf.worker.js
+*.data

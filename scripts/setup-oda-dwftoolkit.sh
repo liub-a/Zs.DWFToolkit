@@ -36,4 +36,17 @@ case "$INPUT_ARCHIVE" in
     ;;
 esac
 
+# WebAssembly (Emscripten) support: DWFCore's platform detection in Core.h has no
+# branch for wasm and hits "#error DWFCORE Undefined Platform". Add one (mapping
+# wasm to the ARM system, a known-good little-endian/no-asm config). Idempotent.
+CORE_H="$TARGET/develop/global/src/dwfcore/Core.h"
+if [[ -f "$CORE_H" ]] && ! grep -q "__wasm__" "$CORE_H"; then
+  perl -0pi -e 's/(#elif\s+defined\(__arm__\) \|\| defined\(__aarch64__\)\n#define _DWFCORE_ARM_SYSTEM\n)(#else\n#error DWFCORE Undefined Platform)/${1}#elif   defined(__wasm__) || defined(__wasm32__) || defined(__EMSCRIPTEN__)\n#define _DWFCORE_ARM_SYSTEM\n${2}/' "$CORE_H"
+  if grep -q "__wasm__" "$CORE_H"; then
+    echo "Applied WebAssembly platform patch to dwfcore/Core.h"
+  else
+    echo "WARNING: failed to apply WebAssembly platform patch to dwfcore/Core.h" >&2
+  fi
+fi
+
 echo "ODA-modified DWFToolkit extracted to: $TARGET"
