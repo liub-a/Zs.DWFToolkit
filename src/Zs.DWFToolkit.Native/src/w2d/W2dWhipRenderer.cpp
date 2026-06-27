@@ -28,6 +28,17 @@ extern "C" {
 }
 #endif
 
+// On the Emscripten/wasm build the toolkit is compiled with -DEMCC, under which the
+// WT_*Ellipse accessors are named major_version()/minor_version() (to dodge the
+// major()/minor() macros from <sys/sysmacros.h>). Native builds keep major()/minor().
+#ifdef EMCC
+#define ZS_WT_MAJOR(e) ((e).major_version())
+#define ZS_WT_MINOR(e) ((e).minor_version())
+#else
+#define ZS_WT_MAJOR(e) ((e).major())
+#define ZS_WT_MINOR(e) ((e).minor())
+#endif
+
 namespace zs::dwf::w2d
 {
 using namespace zs::dwf::native_render;
@@ -286,7 +297,7 @@ namespace
     {
         const double cx = static_cast<double>(e.position().m_x);
         const double cy = static_cast<double>(e.position().m_y);
-        const double r = static_cast<double>(std::max(std::abs(e.major()), std::abs(e.minor())));
+        const double r = static_cast<double>(std::max(std::abs(ZS_WT_MAJOR(e)), std::abs(ZS_WT_MINOR(e))));
         b.include(cx - r, cy - r);
         b.include(cx + r, cy + r);
     }
@@ -304,8 +315,8 @@ namespace
         {
             c->canvas->draw_ellipse(
                 { static_cast<double>(item.position().m_x), static_cast<double>(item.position().m_y) },
-                static_cast<double>(std::abs(item.major())),
-                static_cast<double>(std::abs(item.minor())),
+                static_cast<double>(std::abs(ZS_WT_MAJOR(item))),
+                static_cast<double>(std::abs(ZS_WT_MINOR(item))),
                 item.tilt_radian(),
                 current_color(file),
                 current_thickness(file, c->canvas));
@@ -326,8 +337,8 @@ namespace
         {
             c->canvas->fill_ellipse(
                 { static_cast<double>(item.position().m_x), static_cast<double>(item.position().m_y) },
-                static_cast<double>(std::abs(item.major())),
-                static_cast<double>(std::abs(item.minor())),
+                static_cast<double>(std::abs(ZS_WT_MAJOR(item))),
+                static_cast<double>(std::abs(ZS_WT_MINOR(item))),
                 item.tilt_radian(),
                 current_color(file));
         }
