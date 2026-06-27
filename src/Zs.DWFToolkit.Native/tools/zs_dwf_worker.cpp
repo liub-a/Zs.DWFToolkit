@@ -25,7 +25,7 @@ int usage()
     std::fprintf(stderr,
         "usage:\n"
         "  zs_dwf_worker info <input>\n"
-        "  zs_dwf_worker page <input> <page> <output> <width> <height> <dpi>\n"
+        "  zs_dwf_worker page <input> <page> <output> <width> <height> <dpi> [hiddenLayers]\n"
         "  zs_dwf_worker w2d  <input> <output> <width> <height> <dpi>\n"
         "  zs_dwf_worker pdf  <input> <output.pdf>\n");
     return ZS_DWF_INVALID_ARGUMENT;
@@ -51,11 +51,29 @@ int main(int argc, char** argv)
     {
         rc = zs_dwf_get_info_json(argv[2], json.data(), kJsonBuffer);
     }
-    else if (cmd == "page" && argc == 8)
+    else if (cmd == "page" && (argc == 8 || argc == 9))
     {
-        rc = zs_dwf_render_page(argv[2], std::atoi(argv[3]), argv[4],
-                                std::atoi(argv[5]), std::atoi(argv[6]), std::atoi(argv[7]),
-                                json.data(), kJsonBuffer);
+        // page <input> <page> <output> <width> <height> <dpi> [hiddenLayers]
+        // hiddenLayers is an optional comma-separated list of WHIP layer numbers.
+        std::vector<int> hidden;
+        if (argc == 9)
+        {
+            std::string cur;
+            for (const char* p = argv[8]; ; ++p)
+            {
+                if (*p == ',' || *p == '\0')
+                {
+                    if (!cur.empty()) hidden.push_back(std::atoi(cur.c_str()));
+                    cur.clear();
+                    if (!*p) break;
+                }
+                else cur += *p;
+            }
+        }
+        rc = zs_dwf_render_page_ex(argv[2], std::atoi(argv[3]), argv[4],
+                                   std::atoi(argv[5]), std::atoi(argv[6]), std::atoi(argv[7]),
+                                   hidden.empty() ? nullptr : hidden.data(), static_cast<int>(hidden.size()),
+                                   json.data(), kJsonBuffer);
     }
     else if (cmd == "w2d" && argc == 7)
     {

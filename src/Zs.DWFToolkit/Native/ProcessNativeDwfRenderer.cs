@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 using Zs.DWFToolkit.Abstractions;
 using Zs.DWFToolkit.Internal;
@@ -42,10 +43,17 @@ public sealed class ProcessNativeDwfRenderer : INativeDwfRenderer
     }
 
     public Task<DwfRenderResult> RenderPageAsync(string sourcePath, int pageIndex, string outputPath, DwfRenderOptions options, CancellationToken cancellationToken = default)
-        => RenderAsync(
-            new[] { "page", sourcePath, pageIndex.ToString(System.Globalization.CultureInfo.InvariantCulture), outputPath,
-                    Width(options), Height(options), options.Dpi.ToString(System.Globalization.CultureInfo.InvariantCulture) },
-            sourcePath, pageIndex, outputPath, options, cancellationToken);
+    {
+        var args = new List<string>
+        {
+            "page", sourcePath, pageIndex.ToString(System.Globalization.CultureInfo.InvariantCulture), outputPath,
+            Width(options), Height(options), options.Dpi.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        };
+        // Optional trailing arg: comma-separated WHIP layer numbers to hide.
+        if (options.HiddenLayers is { Count: > 0 } hidden)
+            args.Add(string.Join(",", hidden.Select(n => n.ToString(System.Globalization.CultureInfo.InvariantCulture))));
+        return RenderAsync(args.ToArray(), sourcePath, pageIndex, outputPath, options, cancellationToken);
+    }
 
     public Task<DwfRenderResult> RenderW2dFileAsync(string sourcePath, string outputPath, DwfRenderOptions options, CancellationToken cancellationToken = default)
         => RenderAsync(
