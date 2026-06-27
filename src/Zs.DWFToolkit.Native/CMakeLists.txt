@@ -325,6 +325,32 @@ if(ZS_DWF_BUILD_TESTS)
         endif()
         add_test(NAME w2d_roundtrip_tests COMMAND w2d_roundtrip_tests)
 
+        # Layer reading: writes a layered W2D with the toolkit, reads it back.
+        add_executable(layer_tests tests/layer_tests.cpp)
+        target_include_directories(layer_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/compat/oda
+            ${CMAKE_CURRENT_SOURCE_DIR}/compat/oda/Include
+            ${ZS_DWF_ODA_DWFTK_ROOT}/develop/global/src
+            ${ZS_DWF_ODA_DWFTK_ROOT}/develop/global/src/dwf
+        )
+        target_link_libraries(layer_tests PRIVATE zs_dwf_toolkit_native)
+        zs_dwf_apply_our_msvc_defs(layer_tests)
+        if(APPLE OR MSVC)
+            target_link_libraries(layer_tests PRIVATE ${_oda_test_libs} ${ZS_JPEG_LIB} zlibstatic)
+        else()
+            target_link_libraries(layer_tests PRIVATE
+                -Wl,--start-group ${_oda_test_libs} ${ZS_JPEG_LIB} zlibstatic -Wl,--end-group)
+        endif()
+        if(MSVC)
+            target_link_libraries(layer_tests PRIVATE rpcrt4)
+        endif()
+        if(TARGET Threads::Threads)
+            target_link_libraries(layer_tests PRIVATE Threads::Threads)
+        endif()
+        add_test(NAME layer_tests COMMAND layer_tests)
+
         # Regression against the public ocean_90.w2d sample (path via ZS_DWF_OCEAN_W2D;
         # no-op pass when unset). Baselines are defined here once captured.
         add_executable(ocean_regression_tests tests/ocean_regression_tests.cpp)

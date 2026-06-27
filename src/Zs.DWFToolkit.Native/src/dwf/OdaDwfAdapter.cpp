@@ -149,6 +149,52 @@ namespace
 
         return nullptr;
     }
+
+    // Extracts a page's W2D and collects its WHIP layers into a JSON fragment
+    // ("layers":[...],"layersParsed":bool) for embedding in the page object. Always
+    // returns valid JSON; on any failure it yields an empty list with
+    // layersParsed=false so the managed side can tell "no layers" from "not parsed".
+    std::string collect_layers_json(DWFToolkit::DWFPackageReader& reader,
+                                    DWFToolkit::DWFResource* w2d, int page_index)
+    {
+        const char* kNone = "\"layers\":[],\"layersParsed\":false";
+        if (!w2d)
+            return kNone;
+        DWFCore::DWFInputStream* stream = nullptr;
+        try { stream = reader.extract(w2d->href(), false); }
+        catch (...) { return kNone; }
+        if (!stream)
+            return kNone;
+
+        const std::string temp = make_temp_w2d_path(page_index);
+        std::string err;
+        const bool extracted = extract_stream_to_file(*stream, temp, err);
+        DWFCORE_FREE_OBJECT(stream);
+        std::error_code ec;
+        if (!extracted)
+        {
+            std::filesystem::remove(temp, ec);
+            return kNone;
+        }
+
+        std::vector<zs::dwf::w2d::W2dLayer> layers;
+        const auto rr = zs::dwf::w2d::collect_w2d_file_layers(temp, layers);
+        std::filesystem::remove(temp, ec);
+        if (!rr.success)
+            return kNone;
+
+        std::ostringstream o;
+        o << "\"layers\":[";
+        for (std::size_t i = 0; i < layers.size(); ++i)
+        {
+            if (i) o << ",";
+            o << "{\"index\":" << layers[i].number
+              << ",\"name\":\"" << json_escape_str(layers[i].name) << "\""
+              << ",\"visible\":" << (layers[i].visible ? "true" : "false") << "}";
+        }
+        o << "],\"layersParsed\":true";
+        return o.str();
+    }
 #endif
 }
 
@@ -394,7 +440,8 @@ InfoResult get_dwf_info_json(const std::string& input_path)
                           << "\"pageName\":\"" << json_escape_str(title) << "\","
                           << "\"graphicsResourcePath\":\"" << json_escape_str(href) << "\","
                           << "\"has2dGraphics\":" << (w2d ? "true" : "false") << ","
-                          << "\"unit\":\"dwf_internal\""
+                          << "\"unit\":\"dwf_internal\","
+                          << collect_layers_json(reader, w2d, page_count)
                           << "}";
                     ++page_count;
                 }

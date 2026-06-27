@@ -21,7 +21,7 @@ public sealed class ZsDwfToolkit
         IDwfConverter? converter = null,
         IDwfEditor? editor = null)
     {
-        _reader = reader ?? new DwfDocumentReader();
+        _reader = reader ?? new DwfDocumentReader(new NativeDwfRenderer());
         _thumbnailExtractor = thumbnailExtractor ?? new DwfThumbnailExtractor();
         _converter = converter ?? new DwfxExternalConverter(_reader, _thumbnailExtractor, new NativeDwfRenderer());
         _editor = editor ?? new NativeDwfEditor();

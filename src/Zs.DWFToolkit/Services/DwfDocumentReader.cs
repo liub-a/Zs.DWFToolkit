@@ -12,16 +12,34 @@ namespace Zs.DWFToolkit.Services;
 /// </summary>
 public sealed class DwfDocumentReader : IDwfDocumentReader
 {
-    public Task<DwfDocumentInfo> ReadInfoAsync(string sourcePath, CancellationToken cancellationToken = default)
+    private readonly INativeDwfRenderer? _nativeRenderer;
+    private readonly bool _readLayers;
+
+    /// <param name="nativeRenderer">
+    /// Optional native renderer used to read per-page 2D layers (WT_Layer), which live
+    /// in the binary W2D stream and cannot be read from the managed/OPC path. When null
+    /// or unavailable, pages come back with an empty <see cref="DwfPageInfo.Layers"/>.
+    /// </param>
+    /// <param name="readLayers">
+    /// When true (default) and a native renderer is available, ReadInfoAsync parses each
+    /// page's W2D to fill its layer list. Set false to skip that extra parse for speed.
+    /// </param>
+    public DwfDocumentReader(INativeDwfRenderer? nativeRenderer = null, bool readLayers = true)
+    {
+        _nativeRenderer = nativeRenderer;
+        _readLayers = readLayers;
+    }
+
+    public async Task<DwfDocumentInfo> ReadInfoAsync(string sourcePath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(sourcePath))
         {
-            return Task.FromResult(Fail(sourcePath, DwfErrorCodes.InvalidArgument, "sourcePath is required."));
+            return (Fail(sourcePath, DwfErrorCodes.InvalidArgument, "sourcePath is required."));
         }
 
         if (!File.Exists(sourcePath))
         {
-            return Task.FromResult(Fail(sourcePath, DwfErrorCodes.FileNotFound, "File not found."));
+            return (Fail(sourcePath, DwfErrorCodes.FileNotFound, "File not found."));
         }
 
         try
@@ -44,7 +62,7 @@ public sealed class DwfDocumentReader : IDwfDocumentReader
                 info.Success = false;
                 info.ErrorCode = DwfErrorCodes.UnsupportedFormat;
                 info.ErrorMessage = "The file is not a ZIP/OPC style DWF package. Native DWF Toolkit integration may be required.";
-                return Task.FromResult(info);
+                return (info);
             }
 
             using var archive = DwfPackage.OpenRead(sourcePath);
@@ -60,15 +78,43 @@ public sealed class DwfDocumentReader : IDwfDocumentReader
             info.Pages = DiscoverPages(archive, info.Entries, kind);
             AttachThumbnails(info);
 
-            return Task.FromResult(info);
+            if (_readLayers && _nativeRenderer is { IsAvailable: true })
+                await MergeNativeLayersAsync(sourcePath, info, cancellationToken).ConfigureAwait(false);
+
+            return (info);
         }
         catch (InvalidDataException ex)
         {
-            return Task.FromResult(Fail(sourcePath, DwfErrorCodes.InvalidPackage, ex.Message));
+            return (Fail(sourcePath, DwfErrorCodes.InvalidPackage, ex.Message));
         }
         catch (Exception ex)
         {
-            return Task.FromResult(Fail(sourcePath, DwfErrorCodes.InvalidPackage, ex.ToString()));
+            return (Fail(sourcePath, DwfErrorCodes.InvalidPackage, ex.ToString()));
+        }
+    }
+
+    // Reads layers via the native renderer and copies them onto the managed pages by
+    // page index. Best-effort: any failure leaves pages with their (empty) defaults.
+    private async Task MergeNativeLayersAsync(string sourcePath, DwfDocumentInfo info, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var native = await _nativeRenderer!.GetInfoAsync(sourcePath, cancellationToken).ConfigureAwait(false);
+            if (!native.Success || native.Pages.Count == 0)
+                return;
+            var byIndex = native.Pages.ToDictionary(p => p.PageIndex);
+            foreach (var page in info.Pages)
+            {
+                if (byIndex.TryGetValue(page.PageIndex, out var np))
+                {
+                    page.Layers = np.Layers;
+                    page.LayersParsed = np.LayersParsed;
+                }
+            }
+        }
+        catch
+        {
+            // Layer reading is non-essential; never fail ReadInfoAsync because of it.
         }
     }
 

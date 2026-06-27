@@ -855,4 +855,91 @@ RenderResult render_w2d_file_to_pdf_page(
 #endif
 }
 
+#ifdef ZS_DWF_WITH_ODA_DWFTK
+namespace
+{
+    std::string utf16_to_utf8(const WT_Unsigned_Integer16* s, int n)
+    {
+        std::string out;
+        if (!s || n <= 0) return out;
+        out.reserve(static_cast<std::size_t>(n));
+        for (int i = 0; i < n; ++i)
+        {
+            const unsigned int cp = s[i];
+            if (cp < 0x80) out += static_cast<char>(cp);
+            else if (cp < 0x800)
+            {
+                out += static_cast<char>(0xC0 | (cp >> 6));
+                out += static_cast<char>(0x80 | (cp & 0x3F));
+            }
+            else
+            {
+                out += static_cast<char>(0xE0 | (cp >> 12));
+                out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+                out += static_cast<char>(0x80 | (cp & 0x3F));
+            }
+        }
+        return out;
+    }
+
+    WT_Result on_layer_collect(WT_Layer& item, WT_File& file)
+    {
+        auto* out = static_cast<std::vector<W2dLayer>*>(file.heuristics().user_data());
+        if (out)
+        {
+            const int num = item.layer_num();
+            bool seen = false;
+            for (const auto& l : *out)
+                if (l.number == num) { seen = true; break; }
+            if (!seen)
+            {
+                const WT_String& nm = item.layer_name();
+                W2dLayer layer;
+                layer.number = num;
+                layer.name = utf16_to_utf8(nm.unicode(), nm.length());
+                layer.visible = item.visibility() != 0;
+                out->push_back(std::move(layer));
+            }
+        }
+        return WT_Layer::default_process(item, file);
+    }
+}
+#endif
+
+RenderResult collect_w2d_file_layers(
+    const std::string& w2d_path,
+    std::vector<W2dLayer>& out_layers)
+{
+#ifndef ZS_DWF_WITH_ODA_DWFTK
+    (void)w2d_path;
+    (void)out_layers;
+    return RenderResult{false, 1007, "unsupported_dwf_rendering",
+        "W2D layer reading requires building native library with ZS_DWF_ENABLE_ODA_DWFTK=ON.", ""};
+#else
+    std::ifstream probe(w2d_path, std::ios::binary);
+    if (!probe.good())
+        return RenderResult{false, 1002, "file_not_found", "W2D input file is not readable", ""};
+
+    WT_File file;
+    file.set_filename(w2d_path.c_str());
+    file.set_file_mode(WT_File::File_Read);
+    file.heuristics().set_user_data(&out_layers);
+    file.set_layer_action(on_layer_collect);
+
+    if (file.open() != WT_Result::Success)
+        return RenderResult{false, 1007, "w2d_parse_failed", "Failed to open W2D stream for layer reading", ""};
+
+    for (;;)
+    {
+        const WT_Result r = file.process_next_object();
+        if (r == WT_Result::Success || r == WT_Result::Waiting_For_Data)
+            continue;
+        file.close();
+        if (r == WT_Result::End_Of_DWF_Opcode_Found || r == WT_Result::End_Of_File_Error)
+            return RenderResult{true, 0, "", "", ""};
+        return RenderResult{false, 1007, "w2d_parse_failed", "Failed to parse W2D stream for layers", ""};
+    }
+#endif
+}
+
 } // namespace zs::dwf::w2d
