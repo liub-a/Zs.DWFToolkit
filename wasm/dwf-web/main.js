@@ -7,10 +7,12 @@ const els = {
   file: document.getElementById('file'),
   info: document.getElementById('btnInfo'),
   pdf: document.getElementById('btnPdf'),
+  png: document.getElementById('btnPng'),
   dl: document.getElementById('dl'),
   rt: document.getElementById('rt'),
   log: document.getElementById('log'),
   view: document.getElementById('view'),
+  img: document.getElementById('img'),
 };
 
 let mod = null;          // the Emscripten module
@@ -34,6 +36,7 @@ function refreshButtons() {
   const ok = !!(mod && inputBytes);
   els.info.disabled = !ok;
   els.pdf.disabled = !ok;
+  els.png.disabled = !ok;
 }
 
 function loadFile(file) {
@@ -89,6 +92,32 @@ function renderPdf() {
   els.dl.hidden = false;
 }
 
+function renderPng() {
+  const inPath = writeInput();
+  const out = 'out.png';
+  const w = 1600, h = 1131, dpi = 150; // landscape A-series-ish; native preserves content
+  const cap = 1 << 16;
+  const buf = mod._malloc(cap);
+  log('rendering PNG…');
+  const t0 = performance.now();
+  // .w2d -> single W2D stream; otherwise a DWF package page 0.
+  const rc = inPath.endsWith('.w2d')
+    ? mod.ccall('zs_w2d_render_file', 'number',
+        ['string', 'string', 'number', 'number', 'number', 'number', 'number'],
+        [inPath, out, w, h, dpi, buf, cap])
+    : mod.ccall('zs_dwf_render_page', 'number',
+        ['string', 'number', 'string', 'number', 'number', 'number', 'number', 'number'],
+        [inPath, 0, out, w, h, dpi, buf, cap]);
+  mod._free(buf);
+  if (rc !== 0) { log('PNG render failed rc=' + rc + ' ' + lastError()); return; }
+  const bytes = mod.FS.readFile(out);
+  const ms = Math.round(performance.now() - t0);
+  log(`PNG: ${(bytes.length / 1024).toFixed(0)} KB in ${ms} ms`);
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+  els.img.src = url; els.img.hidden = false;
+  els.view.hidden = true;
+}
+
 // --- UI wiring --------------------------------------------------------------
 els.drop.addEventListener('click', () => els.file.click());
 els.file.addEventListener('change', (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); });
@@ -99,3 +128,4 @@ els.file.addEventListener('change', (e) => { if (e.target.files[0]) loadFile(e.t
 els.drop.addEventListener('drop', (e) => { if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
 els.info.addEventListener('click', readInfo);
 els.pdf.addEventListener('click', renderPdf);
+els.png.addEventListener('click', renderPng);

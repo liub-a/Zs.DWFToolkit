@@ -31,12 +31,15 @@
   <div class="row">
     <button id="btnInfo" disabled>Read info</button>
     <button id="btnPdf" disabled>Render vector PDF</button>
+    <button id="btnPng" disabled>Render PNG</button>
     <a id="dl" hidden>Download PDF</a>
     <span id="rt" style="color:#888">loading WebAssembly runtime…</span>
   </div>
 
   <div id="log"></div>
   <iframe id="view" hidden title="rendered PDF"></iframe>
+  <img id="img" hidden alt="rendered PNG" style="max-width:100%;border:1px solid #888;border-radius:7px;margin-top:.5rem">
+
 
   <script src="zs_dwf.js"></script>
   <script src="main.js"></script>
