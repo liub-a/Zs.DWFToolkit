@@ -82,15 +82,17 @@ public sealed class NativeDwfRenderer : INativeDwfRenderer
         var buffer = new StringBuilder(1024 * 1024);
         try
         {
-            var code = NativeMethods.RenderPage(
-                sourcePath,
-                pageIndex,
-                outputPath,
-                options.WidthPx ?? 2400,
-                options.HeightPx ?? 1600,
-                options.Dpi,
-                buffer,
-                buffer.Capacity);
+            var hidden = options.HiddenLayers is { Count: > 0 } hl ? hl.ToArray() : null;
+            var code = hidden is null
+                ? NativeMethods.RenderPage(
+                    sourcePath, pageIndex, outputPath,
+                    options.WidthPx ?? 2400, options.HeightPx ?? 1600, options.Dpi,
+                    buffer, buffer.Capacity)
+                : NativeMethods.RenderPageEx(
+                    sourcePath, pageIndex, outputPath,
+                    options.WidthPx ?? 2400, options.HeightPx ?? 1600, options.Dpi,
+                    hidden, hidden.Length,
+                    buffer, buffer.Capacity);
 
             if (code != 0)
             {

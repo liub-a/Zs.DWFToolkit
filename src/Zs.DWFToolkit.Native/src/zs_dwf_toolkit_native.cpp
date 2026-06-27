@@ -2,6 +2,7 @@
 #include <cstring>
 #include <string>
 #include <fstream>
+#include <vector>
 #include "dwf/OdaDwfAdapter.h"
 #include "w2d/W2dWhipRenderer.h"
 #include "edit/W2dStamp.h"
@@ -77,13 +78,14 @@ extern "C" ZS_DWF_API int zs_dwf_get_info_json(
     return info.success ? ZS_DWF_OK : info.result_code;
 }
 
-extern "C" ZS_DWF_API int zs_dwf_render_page(
+static int render_page_impl(
     const char* input_path,
     int page_index,
     const char* output_path,
     int width_px,
     int height_px,
     int dpi,
+    const std::vector<int>* hidden_layers,
     char* output_json,
     int output_json_size)
 {
@@ -104,7 +106,8 @@ extern "C" ZS_DWF_API int zs_dwf_render_page(
         output_path,
         width_px,
         height_px,
-        dpi);
+        dpi,
+        hidden_layers);
 
     const std::string json = result.json.empty()
         ? (std::string("{") +
@@ -124,6 +127,41 @@ extern "C" ZS_DWF_API int zs_dwf_render_page(
 
     g_last_error = result.error_message;
     return result.success ? ZS_DWF_OK : result.result_code;
+}
+
+extern "C" ZS_DWF_API int zs_dwf_render_page(
+    const char* input_path,
+    int page_index,
+    const char* output_path,
+    int width_px,
+    int height_px,
+    int dpi,
+    char* output_json,
+    int output_json_size)
+{
+    return render_page_impl(input_path, page_index, output_path, width_px, height_px, dpi,
+                            nullptr, output_json, output_json_size);
+}
+
+// Same as zs_dwf_render_page but hides the layers whose numbers are in
+// hidden_layers[0..hidden_count). Pass null/0 to render all layers.
+extern "C" ZS_DWF_API int zs_dwf_render_page_ex(
+    const char* input_path,
+    int page_index,
+    const char* output_path,
+    int width_px,
+    int height_px,
+    int dpi,
+    const int* hidden_layers,
+    int hidden_count,
+    char* output_json,
+    int output_json_size)
+{
+    std::vector<int> hidden;
+    if (hidden_layers && hidden_count > 0)
+        hidden.assign(hidden_layers, hidden_layers + hidden_count);
+    return render_page_impl(input_path, page_index, output_path, width_px, height_px, dpi,
+                            hidden.empty() ? nullptr : &hidden, output_json, output_json_size);
 }
 
 extern "C" ZS_DWF_API int zs_w2d_render_file(

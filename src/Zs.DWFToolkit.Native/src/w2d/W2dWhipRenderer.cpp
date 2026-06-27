@@ -81,6 +81,10 @@ namespace
         int polymarker_count{0};
         int macro_draw_count{0};
         int unsupported_count{0};
+        // Phase 2: layers whose geometry should be hidden at render time (by layer
+        // number). current_layer tracks the active WT_Layer during the paint pass.
+        const std::vector<int>* hidden_layers{nullptr};
+        int current_layer{-1};
     };
 
     W2dContext* ctx(WT_File& file)
@@ -93,7 +97,22 @@ namespace
     // skipped during the painting pass.
     bool is_visible(WT_File& file)
     {
-        return file.rendition().visibility().visible() != 0;
+        if (file.rendition().visibility().visible() == 0)
+            return false;
+        // Hide geometry whose active layer is in the caller's hidden-layer set.
+        const W2dContext* c = ctx(file);
+        if (c && c->hidden_layers && c->current_layer >= 0)
+            for (const int h : *c->hidden_layers)
+                if (h == c->current_layer)
+                    return false;
+        return true;
+    }
+
+    WT_Result on_layer(WT_Layer& item, WT_File& file)
+    {
+        W2dContext* c = ctx(file);
+        if (c) c->current_layer = item.layer_num();
+        return WT_Layer::default_process(item, file);
     }
 
     Rgba current_color(WT_File& file)
@@ -633,6 +652,7 @@ namespace
         file.set_macro_draw_action(on_macro_draw);
         file.set_viewport_action(on_viewport);
         file.set_view_action(on_view);
+        file.set_layer_action(on_layer);
 
         WT_Result result = file.open();
         if (result != WT_Result::Success)
@@ -677,7 +697,8 @@ RenderResult render_w2d_file_to_png(
     int page_index,
     int width_px,
     int height_px,
-    int dpi)
+    int dpi,
+    const std::vector<int>* hidden_layers)
 {
 #ifndef ZS_DWF_WITH_ODA_DWFTK
     (void)w2d_path;
@@ -686,6 +707,7 @@ RenderResult render_w2d_file_to_png(
     (void)width_px;
     (void)height_px;
     (void)dpi;
+    (void)hidden_layers;
     return RenderResult{
         false,
         1007,
@@ -736,6 +758,7 @@ RenderResult render_w2d_file_to_png(
     painter.collecting = false;
     painter.bounds = collector.bounds;
     painter.canvas = &canvas;
+    painter.hidden_layers = hidden_layers;
     result = process_w2d(w2d_path, painter);
     if (result != WT_Result::Success)
     {

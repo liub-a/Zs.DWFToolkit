@@ -4,6 +4,7 @@
 // particular sample (many AutoCAD plate-plot DWFs carry no layers at all).
 #include "whiptk/whip_toolkit.h"
 #include "w2d/W2dWhipRenderer.h"
+#include "render/MinimalPng.h"
 
 #include <cstdio>
 #include <filesystem>
@@ -67,8 +68,27 @@ int main()
         expect(layers[1].name == "\xE6\xA0\x87\xE6\xB3\xA8", "layer[1] name CJK UTF-8 round-trip");
     }
 
+    // Phase 2: hiding layer 10 (the polyline) should remove ink vs the full render.
+    auto count_nonwhite = [](const std::string& png) -> long {
+        int w = 0, h = 0; std::vector<zs::dwf::native_render::Rgba> px; std::string e;
+        if (!zs::dwf::native_render::read_png_rgba(png, w, h, px, e)) return -1;
+        long n = 0; for (const auto& p : px) if (!(p.r == 255 && p.g == 255 && p.b == 255)) ++n;
+        return n;
+    };
+    const std::string pngAll = (std::filesystem::temp_directory_path() / "zs_layer_all.png").string();
+    const std::string pngHid = (std::filesystem::temp_directory_path() / "zs_layer_hid.png").string();
+    const auto rAll = zs::dwf::w2d::render_w2d_file_to_png(w2d, pngAll, 0, 400, 400, 96, nullptr);
+    std::vector<int> hide = { 10 };
+    const auto rHid = zs::dwf::w2d::render_w2d_file_to_png(w2d, pngHid, 0, 400, 400, 96, &hide);
+    expect(rAll.success && rHid.success, "both renders succeed");
+    const long nAll = count_nonwhite(pngAll), nHid = count_nonwhite(pngHid);
+    expect(nAll > 0, "full render has ink");
+    expect(nHid >= 0 && nHid < nAll, "hiding layer 10 reduces ink (" + std::to_string(nHid) + " < " + std::to_string(nAll) + ")");
+
     std::error_code ec;
     std::filesystem::remove(w2d, ec);
-    if (g_failures == 0) std::printf("OK: %zu layers read\n", layers.size());
+    std::filesystem::remove(pngAll, ec);
+    std::filesystem::remove(pngHid, ec);
+    if (g_failures == 0) std::printf("OK: %zu layers read; hide-layer ink %ld -> %ld\n", layers.size(), nAll, nHid);
     return g_failures == 0 ? 0 : 1;
 }

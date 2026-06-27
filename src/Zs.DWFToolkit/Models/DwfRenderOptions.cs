@@ -57,6 +57,13 @@ public sealed class DwfRenderOptions
     /// </summary>
     public bool VectorPdf { get; set; } = false;
 
+    /// <summary>
+    /// WHIP layer numbers to hide when rendering a page (see <see cref="DwfLayerInfo.Index"/>).
+    /// Geometry on these layers is skipped. Empty renders all layers. Honored by the
+    /// in-process native renderer (RenderPageAsync).
+    /// </summary>
+    public IReadOnlyList<int> HiddenLayers { get; set; } = [];
+
     /// <summary>Optional fixed page width in PDF points for the simple image PDF writer.</summary>
     public double? PdfPageWidthPoints { get; set; }
 

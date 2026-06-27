@@ -32,7 +32,8 @@ RenderResult render_w2d_file_to_png(
     int page_index,
     int width_px,
     int height_px,
-    int dpi);
+    int dpi,
+    const std::vector<int>* hidden_layers = nullptr);
 
 // Renders a single W2D stream to one true-vector PDF page (filled into out_page:
 // content stream + media box in points + any embedded raster sub-images). The page

@@ -204,7 +204,8 @@ RenderResult render_dwf_or_w2d_page_to_png(
     const std::string& output_path,
     int width_px,
     int height_px,
-    int dpi)
+    int dpi,
+    const std::vector<int>* hidden_layers)
 {
 #ifndef ZS_DWF_WITH_ODA_DWFTK
     (void)input_path;
@@ -213,6 +214,7 @@ RenderResult render_dwf_or_w2d_page_to_png(
     (void)width_px;
     (void)height_px;
     (void)dpi;
+    (void)hidden_layers;
     return RenderResult{
         false,
         1007,
@@ -231,7 +233,7 @@ RenderResult render_dwf_or_w2d_page_to_png(
         if (info.eType == DWFToolkit::DWFPackageReader::eW2DStream ||
             info.eType == DWFToolkit::DWFPackageReader::eDWFStream)
         {
-            return render_w2d_file_to_png(input_path, output_path, page_index, width_px, height_px, dpi);
+            return render_w2d_file_to_png(input_path, output_path, page_index, width_px, height_px, dpi, hidden_layers);
         }
 
         if (info.eType != DWFToolkit::DWFPackageReader::eDWFPackage &&
@@ -275,7 +277,7 @@ RenderResult render_dwf_or_w2d_page_to_png(
         if (!extracted)
             return RenderResult{false, 1008, "w2d_extract_failed", extract_error, ""};
 
-        RenderResult rr = render_w2d_file_to_png(temp_w2d, output_path, page_index, width_px, height_px, dpi);
+        RenderResult rr = render_w2d_file_to_png(temp_w2d, output_path, page_index, width_px, height_px, dpi, hidden_layers);
         std::error_code ec;
         std::filesystem::remove(temp_w2d, ec);
         return rr;

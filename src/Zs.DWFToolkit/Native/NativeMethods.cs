@@ -32,6 +32,19 @@ internal static partial class NativeMethods
         StringBuilder outputJson,
         int outputJsonSize);
 
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, EntryPoint = "zs_dwf_render_page_ex")]
+    internal static extern int RenderPageEx(
+        string inputPath,
+        int pageIndex,
+        string outputPath,
+        int widthPx,
+        int heightPx,
+        int dpi,
+        int[]? hiddenLayers,
+        int hiddenCount,
+        StringBuilder outputJson,
+        int outputJsonSize);
+
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, EntryPoint = "zs_dwf_render_dwf_pdf")]
     internal static extern int RenderDwfToPdf(string inputPath, string outputPdfPath);
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "../w2d/W2dWhipRenderer.h"
 #include <string>
+#include <vector>
 
 namespace zs::dwf::oda
 {
@@ -11,7 +12,8 @@ zs::dwf::w2d::RenderResult render_dwf_or_w2d_page_to_png(
     const std::string& output_path,
     int width_px,
     int height_px,
-    int dpi);
+    int dpi,
+    const std::vector<int>* hidden_layers = nullptr);
 
 // Reads package-level info (sections -> pages) from a DWF/DWFx file and returns a
 // JSON document matching the DwfDocumentInfo contract in docs/NATIVE_INTEGRATION.md.

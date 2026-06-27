@@ -47,6 +47,20 @@ ZS_DWF_API int zs_dwf_render_page(
     int output_json_size);
 
 
+// Same as zs_dwf_render_page but hides the layers whose WHIP layer numbers are in
+// hidden_layers[0..hidden_count). Pass null/0 to render every layer.
+ZS_DWF_API int zs_dwf_render_page_ex(
+    const char* input_path,
+    int page_index,
+    const char* output_path,
+    int width_px,
+    int height_px,
+    int dpi,
+    const int* hidden_layers,
+    int hidden_count,
+    char* output_json,
+    int output_json_size);
+
 ZS_DWF_API int zs_w2d_render_file(
     const char* input_path,
     const char* output_path,

@@ -44,7 +44,7 @@ emcc -O3 \
     "$BUILD_DIR/freetype/libfreetype.a" \
   -Wl,--end-group \
   -sALLOW_MEMORY_GROWTH=1 -sMODULARIZE=1 -sEXPORT_NAME=ZsDwf -sEXIT_RUNTIME=0 \
-  -sEXPORTED_FUNCTIONS=_zs_dwf_render_dwf_pdf,_zs_dwf_render_page,_zs_w2d_render_file,_zs_dwf_get_info_json,_zs_dwf_get_last_error,_malloc,_free \
+  -sEXPORTED_FUNCTIONS=_zs_dwf_render_dwf_pdf,_zs_dwf_render_page,_zs_dwf_render_page_ex,_zs_w2d_render_file,_zs_dwf_get_info_json,_zs_dwf_get_last_error,_malloc,_free \
   -sEXPORTED_RUNTIME_METHODS=cwrap,ccall,FS,stringToNewUTF8,UTF8ToString \
   -o "$OUT_DIR/zs_dwf.js"
 
